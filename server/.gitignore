@@ -1,0 +1,15 @@
+# Node modules
+node_modules/
+web/node_modules/
+
+# Environment files
+.env
+server/.env
+web/.env
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
