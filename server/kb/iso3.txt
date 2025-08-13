@@ -1,0 +1,257 @@
+
+
+ISO 45001:2018 Occupational Health and Safety Management System
+
+Overview
+ISO 45001:2018 specifies requirements for an occupational health and safety (OH\&S) management system, and gives guidance for its use, to enable organizations to provide safe and healthy workplaces by preventing work-related injury and ill health, as well as by proactively improving its OH\&S performance.
+
+Key Benefits
+
+* Reduced work-related injuries and illnesses
+* Lower insurance costs and reduced liability
+* Improved regulatory compliance
+* Enhanced employee morale and productivity
+* Better reputation and stakeholder confidence
+* Reduced absenteeism and employee turnover
+
+High Level Structure (HLS)
+
+Clause 4: Context of the Organization
+4.1 Understanding the Organization and its Context
+Determine external and internal issues relevant to purpose and that affect ability to achieve intended outcomes of OH\&S management system.
+
+4.2 Understanding the Needs and Expectations of Interested Parties
+
+* Workers and their representatives
+* Regulatory authorities
+* Parent organization and customers
+* Healthcare providers and emergency services
+* Neighboring communities
+* Suppliers, contractors and visitors
+
+4.3 Determining the Scope of the OH\&S Management System
+Consider activities, products and services within organization's control or influence that can impact OH\&S performance.
+
+4.4 OH\&S Management System
+Establish, implement, maintain and continually improve OH\&S management system to achieve intended outcomes.
+
+Clause 5: Leadership and Worker Participation
+5.1 Leadership and Commitment
+Top management must demonstrate leadership and commitment by:
+
+* Taking overall responsibility and accountability for prevention of work-related injury and ill health
+* Ensuring OH\&S policy and objectives are established and compatible with strategic direction
+* Ensuring integration of OH\&S management system requirements into business processes
+* Ensuring resources needed are available
+* Eliminating hazards and reducing OH\&S risks
+
+5.2 OH\&S Policy
+OH\&S policy must:
+
+* Be appropriate to purpose and context of organization
+* Provide framework for setting OH\&S objectives
+* Include commitment to provide safe and healthy working conditions
+* Include commitment to eliminate hazards and reduce OH\&S risks
+* Include commitment to fulfill legal requirements and other requirements
+* Include commitment to continual improvement
+* Include commitment to consultation and participation of workers
+
+5.3 Organizational Roles, Responsibilities and Authorities
+Assign responsibilities and authorities for:
+
+* Ensuring OH\&S management system conforms to ISO 45001
+* Reporting on performance of OH\&S management system to top management
+* Ensuring workers can report hazards, hazardous situations and OH\&S incidents
+
+5.4 Consultation and Participation of Workers
+Establish, implement and maintain processes for consultation and participation of workers at all applicable levels and functions, and where they exist, workers' representatives.
+
+Clause 6: Planning
+6.1 Actions to Address Risks and Opportunities
+6.1.1 General
+When planning OH\&S management system, consider issues, requirements and determine risks and opportunities that need to be addressed.
+
+6.1.2 Hazard Identification and Assessment of Risks and Opportunities
+6.1.2.1 Hazard Identification
+Establish, implement and maintain processes for hazard identification that:
+
+* Is proactive and reactive
+* Takes into account routine and non-routine activities and situations
+* Takes into account human factors
+* Takes into account how work is actually performed
+* Takes into account past relevant incidents
+
+6.1.2.2 Assessment of OH\&S Risks and Other Risks to the OH\&S Management System
+Assess OH\&S risks from identified hazards, taking into account effectiveness of existing controls and other risks to OH\&S management system.
+
+6.1.2.3 Assessment of OH\&S Opportunities and Other Opportunities for the OH\&S Management System
+Assess OH\&S opportunities to enhance OH\&S performance and other opportunities for OH\&S management system.
+
+6.1.3 Determination of Legal Requirements and Other Requirements
+Determine and have access to up-to-date legal requirements and other requirements that are applicable to hazards, OH\&S risks and OH\&S management system.
+
+6.1.4 Planning Action
+Plan actions to address:
+
+* Hazards and associated OH\&S risks
+* Legal requirements and other requirements
+* OH\&S risks and opportunities identified
+
+6.2 OH\&S Objectives and Planning to Achieve Them
+6.2.1 OH\&S Objectives
+OH\&S objectives must:
+
+* Be consistent with OH\&S policy
+* Be measurable (if practicable) or capable of performance evaluation
+* Take into account applicable requirements
+* Take into account results of consultation with workers
+* Be monitored, communicated and updated as appropriate
+
+6.2.2 Planning to Achieve OH\&S Objectives
+Determine what will be done, what resources required, who will be responsible, when it will be completed, and how results will be evaluated.
+
+Clause 7: Support
+7.1 Resources
+Determine and provide resources needed for establishment, implementation, maintenance and continual improvement of OH\&S management system.
+
+7.2 Competence
+
+* Determine necessary competence of workers that affects or can affect OH\&S performance
+* Ensure workers are competent based on appropriate education, training or experience
+* Take actions to acquire and maintain necessary competence
+* Evaluate effectiveness of actions taken
+
+7.3 Awareness
+Workers must be aware of:
+
+* OH\&S policy and OH\&S objectives
+* Their contribution to effectiveness of OH\&S management system
+* Implications and potential consequences of not conforming
+* Relevant OH\&S incidents and outcomes of investigations
+* Hazards, OH\&S risks and actions that have been taken
+* Ability to remove themselves from work situations they consider present imminent and serious danger
+
+7.4 Communication
+7.4.1 General
+Establish, implement and maintain processes needed for internal and external communications relevant to OH\&S management system.
+
+7.4.2 Internal Communication
+Internally communicate information relevant to OH\&S management system between various levels and functions, including changes.
+
+7.4.3 External Communication
+Externally communicate information relevant to OH\&S management system as established by organization's communication processes and as required by legal requirements.
+
+7.5 Documented Information
+Standard requirements for creating, updating, and controlling documented information.
+
+Clause 8: Operation
+8.1 Operational Planning and Control
+8.1.1 General
+Plan, implement and control processes needed to meet OH\&S management system requirements and implement actions determined in Clause 6.
+
+8.1.2 Eliminating Hazards and Reducing OH\&S Risks
+Establish, implement and maintain processes to eliminate hazards and reduce OH\&S risks using hierarchy of controls:
+
+1. Eliminate the hazard
+2. Substitute with less hazardous processes, operations, materials or equipment
+3. Use engineering controls and reorganization of work
+4. Use administrative controls including training
+5. Use adequate personal protective equipment
+
+8.1.3 Management of Change
+Establish processes to implement and control planned temporary and permanent changes that impact OH\&S performance.
+
+8.1.4 Procurement
+8.1.4.1 General
+Establish, implement and maintain processes to control procurement of products and services to ensure conformity to OH\&S management system.
+
+8.1.4.2 Contractors
+Establish and implement processes to ensure contractors and their workers comply with organization's OH\&S management system requirements.
+
+8.1.4.3 Outsourcing
+Ensure outsourced functions and processes are controlled and coordinated with relevant external providers.
+
+8.2 Emergency Preparedness and Response
+Establish, implement and maintain processes needed to prepare for and respond to potential emergency situations.
+
+Clause 9: Performance Evaluation
+9.1 Monitoring, Measurement, Analysis and Performance Evaluation
+9.1.1 General
+Determine what needs to be monitored and measured, methods for monitoring, measurement, analysis and performance evaluation to ensure valid results.
+
+9.1.2 Evaluation of Compliance
+Establish, implement and maintain processes to evaluate compliance with legal requirements and other requirements.
+
+9.2 Internal Audit
+9.2.1 General
+Conduct internal audits at planned intervals to provide information on whether OH\&S management system conforms to organization's requirements and ISO 45001 requirements, and is effectively implemented and maintained.
+
+9.2.2 Internal Audit Programme
+Plan, establish, implement and maintain audit programme including frequency, methods, responsibilities, consultation, planning requirements and reporting.
+
+9.3 Management Review
+Top management must review organization's OH\&S management system at planned intervals to ensure continuing suitability, adequacy and effectiveness.
+
+Clause 10: Improvement
+10.1 General
+Determine opportunities for improvement and implement necessary actions to achieve intended outcomes of OH\&S management system.
+
+10.2 Incident, Nonconformity and Corrective Action
+10.2.1 General
+Establish, implement and maintain processes to manage incidents and nonconformities including reporting, investigating and taking action.
+
+10.2.2 Incident
+When incident occurs:
+
+* React in timely manner to incident and control and correct it
+* Deal with consequences
+* Evaluate with participation of workers and involvement of relevant interested parties, need for corrective action
+* Implement corrective action including actions to eliminate root causes
+* Evaluate effectiveness of corrective action taken
+* Make changes to OH\&S management system if necessary
+
+10.2.3 Nonconformity
+When nonconformity occurs, react to it and take action to control and correct it, deal with consequences, and evaluate need for corrective action.
+
+10.3 Continual Improvement
+Continually improve suitability, adequacy and effectiveness of OH\&S management system to:
+
+* Prevent occurrence of incidents and nonconformity
+* Promote positive OH\&S culture
+* Enhance OH\&S performance
+
+Common Workplace Hazards
+Physical Hazards
+
+* Noise exposure
+* Vibration (hand-arm, whole body)
+* Temperature extremes (heat, cold)
+* Radiation (ionizing, non-ionizing)
+* Mechanical hazards (moving parts, sharp edges)
+* Electrical hazards
+* Compressed air and gases
+* Working at height
+* Confined spaces
+
+Chemical Hazards
+
+* Toxic substances
+* Carcinogenic materials
+* Corrosive chemicals
+* Flammable and explosive materials
+* Sensitizers and allergens
+* Asbestos and other fibrous materials
+* Dusts and particulates
+* Gases and vapors
+
+Biological Hazards
+
+* Bacteria and viruses
+* Fungi and molds
+* Parasites
+* Blood-borne pathogens
+* Contaminated materials
+* Waste materials
+* Animals and insects
+
+
