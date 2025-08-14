@@ -37,21 +37,37 @@ const themes = {
   },
 };
 
-const LoadingSpinner = () => (
-  <svg 
-    style={{ animation: 'spin 1s linear infinite' }} 
-    width="18" 
-    height="18" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round"
-  >
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
+// Three dots typing indicator for chat
+const TypingIndicator = ({ color }) => (
+  <div style={{
+    display: "flex",
+    gap: "4px",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    padding: "0.5rem 1rem",
+    backgroundColor: color.bg,
+    color: color.text,
+    borderRadius: "18px",
+    maxWidth: "80%",
+    lineHeight: 1.5,
+    boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+    fontSize: "1rem"
+  }}>
+    <span style={dotStyle(0, color.text)} />
+    <span style={dotStyle(1, color.text)} />
+    <span style={dotStyle(2, color.text)} />
+  </div>
 );
+
+const dotStyle = (i, dotColor) => ({
+  width: "6px",
+  height: "6px",
+  backgroundColor: dotColor || "currentColor",
+  borderRadius: "50%",
+  display: "inline-block",
+  animation: `dotPulse 1.4s infinite ease-in-out`,
+  animationDelay: `${i * 0.2}s`
+});
 
 function App() {
   const [messages, setMessages] = useState([
@@ -110,8 +126,9 @@ function App() {
     <>
       <style>
         {`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
+          @keyframes dotPulse {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
           }
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
@@ -202,6 +219,12 @@ function App() {
                 </div>
               </div>
             ))}
+            {/* Typing indicator */}
+            {loading && (
+              <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: "1rem" }}>
+                <TypingIndicator color={{ bg: currentTheme.botBubbleBg, text: currentTheme.botBubbleColor }} />
+              </div>
+            )}
           </div>
 
           {/* Input area */}
@@ -249,7 +272,7 @@ function App() {
                 transition: "background-color 0.3s, transform 0.2s, box-shadow 0.3s"
               }}
             >
-              {loading ? <LoadingSpinner /> : <FiSend size={18} />}
+              <FiSend size={18} />
             </button>
           </div>
         </div>
