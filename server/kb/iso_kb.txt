@@ -16,11 +16,11 @@ Key Principles
 
 Clause Structure
 
-Clause 4: Context of the Organization
+Clause 4: Context of the Organization /n
 4.1 Understanding the Organization and its Context
 
-* Determine external and internal issues relevant to purpose and strategic direction
-* Monitor and review information about these external and internal issues
+1. Determine external and internal issues relevant to purpose and strategic direction
+2. Monitor and review information about these external and internal issues
 
 4.2 Understanding the Needs and Expectations of Interested Parties
 

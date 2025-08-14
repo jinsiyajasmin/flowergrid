@@ -49,7 +49,8 @@ app.post('/chat', async (req, res) => {
 
     const prompt = `
 You are an ISO-only assistant. Use only the provided knowledge base below to answer.
-Avoid phrases like "based on the provided ISO notes" and do not mention sources in your answer.
+Format the answer so that each point is on a separate line and leave a blank line between points.
+Do not use *, #, or any markdown symbols.
 If unsure, simply say "I don't know."
 
 Knowledge base:
@@ -67,7 +68,9 @@ Answer:
       ]
     });
 
-    const text = response.choices[0].message.content;
+    // Clean up extra symbols from AI response just in case
+    let text = response.choices[0].message.content;
+    text = text.replace(/[*#]/g, '').replace(/\r\n/g, '\n');
 
     res.json({ answer: text });
 
@@ -76,6 +79,7 @@ Answer:
     res.status(500).json({ error: 'OpenAI API error', detail: err.message });
   }
 });
+
 
 app.listen(3001, async () => {
   await buildIndex();
