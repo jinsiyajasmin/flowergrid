@@ -1,0 +1,101 @@
+Here’s a structured overview of **ISO 13485:2016 – Medical Devices Quality Management Systems**, in the same format as your ISO 31000 example:
+
+---
+
+# ISO 13485:2016 – Medical Devices Quality Management Systems
+
+**Overview**
+
+ISO 13485:2016 specifies requirements for a quality management system (QMS) where an organization needs to demonstrate its ability to provide medical devices and related services that consistently meet customer and regulatory requirements.
+
+Unlike ISO 9001, ISO 13485 is specific to medical devices and regulatory compliance, emphasizing risk management, traceability, and maintaining effective processes throughout the product lifecycle.
+
+It helps organizations:
+
+* Ensure consistent design, development, production, and delivery of safe medical devices
+* Comply with applicable regulatory requirements globally
+* Improve customer satisfaction and product quality
+* Enhance process control and risk management
+
+Applicable to manufacturers, suppliers, distributors, and service providers in the medical device sector.
+
+---
+
+**Key Benefits**
+
+* Consistent product quality and safety of medical devices
+* Compliance with regulatory and statutory requirements
+* Improved risk management and reduction of product recalls
+* Enhanced credibility with customers, regulators, and stakeholders
+* Better documentation and traceability throughout the device lifecycle
+* Increased efficiency and process control within the organization
+
+---
+
+**Principles of ISO 13485**
+
+ISO 13485 emphasizes the following principles for effective quality management in medical devices:
+
+1. **Customer Focus** – Ensuring devices meet customer and regulatory expectations
+2. **Leadership Commitment** – Management demonstrates commitment to QMS and compliance
+3. **Process Approach** – Managing interrelated processes systematically
+4. **Risk Management** – Integrating risk-based thinking throughout product lifecycle
+5. **Regulatory Compliance** – Meeting applicable laws and medical device regulations
+6. **Documentation & Traceability** – Maintaining clear records of design, production, and delivery
+7. **Continual Improvement** – Enhancing processes, products, and compliance over time
+
+---
+
+**Framework for Quality Management**
+
+ISO 13485 requires a structured QMS framework:
+
+* Leadership and management responsibility
+* Quality planning and objectives
+* Resource allocation (personnel, infrastructure, equipment)
+* Process monitoring, measurement, and analysis
+* Internal audits and management reviews
+* Corrective and preventive actions (CAPA)
+
+---
+
+**Quality Management Process**
+
+The ISO 13485 QMS process includes:
+
+1. **Documented QMS**
+   Define policies, procedures, and responsibilities for quality management.
+
+2. **Risk Management**
+   Assess and control risks associated with design, production, and use of medical devices.
+
+3. **Design and Development Control**
+   Plan, verify, and validate design processes to meet requirements.
+
+4. **Supplier and Purchase Control**
+   Ensure suppliers provide materials and components that meet specifications.
+
+5. **Production and Service Provision**
+   Control manufacturing processes, calibration, sterilization, labeling, and traceability.
+
+6. **Monitoring, Measurement, and Improvement**
+   Track product performance, internal audits, nonconformities, and implement CAPA.
+
+7. **Regulatory Compliance**
+   Maintain compliance with local and international medical device regulations.
+
+---
+
+**Common Areas of Focus under ISO 13485**
+
+* **Design and Development** – Controlled development with validation and risk assessment
+* **Production and Process Control** – Standardized processes for consistency
+* **Supplier Management** – Verification of purchased materials and components
+* **Traceability and Record-Keeping** – Tracking products from raw materials to delivery
+* **Corrective and Preventive Actions (CAPA)** – Detecting and addressing nonconformities
+* **Regulatory Compliance** – Meeting FDA, EU MDR, and other local regulatory requirements
+
+---
+
+If you want, I can also create a **ISO 13485 cheat sheet table with clauses, processes, and key requirements**, just like a quick reference guide. This is really handy for audits or staff training.
+

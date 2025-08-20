@@ -2,7 +2,7 @@
 node_modules/
 
 # Build output
-build/
+build/git clone --mirror 
 dist/
 
 # Logs

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { FiSend, FiSun, FiMoon } from "react-icons/fi";
 
@@ -6,32 +6,34 @@ const themes = {
   light: {
     background: "linear-gradient(135deg, #f0f4f8, #d9e2ec)",
     containerBg: "white",
-    headerBg: "#007bff",
+    headerBg: "#263746",       // Dark grey header
     headerColor: "white",
     chatBg: "#f8fafc",
-    userBubbleBg: "#007bff",
+    userBubbleBg: "#263746",   // Dark grey user bubble
     userBubbleColor: "white",
-    botBubbleBg: "#e2e8f0",
-    botBubbleColor: "#1a202c",
+    botBubbleBg: "#DFF1E9",    // ✅ Updated soft green for bot bubble
+    botBubbleColor: "#000000", // Black text for readability
     inputBg: "white",
-    inputBorder: "#cbd5e0",
-    sendButtonBg: "#007bff",
+    inputBorder: "#263746",    // Dark grey border
+    inputText: "#000000",      // Black text in light mode
+    sendButtonBg: "#263746",   // Dark grey send button
     sendButtonDisabledBg: "#cbd5e0",
     sendButtonColor: "white",
   },
   dark: {
     background: "linear-gradient(135deg, #1f2937, #111827)",
     containerBg: "#1f2937",
-    headerBg: "#374151",
+    headerBg: "#263746",       // Dark grey header
     headerColor: "white",
-    chatBg: "#111827",
-    userBubbleBg: "#4f46e5",
+    chatBg: "#1c2732",
+    userBubbleBg: "#263746",   // Dark grey user bubble
     userBubbleColor: "white",
-    botBubbleBg: "#374151",
-    botBubbleColor: "#d1d5db",
-    inputBg: "#1f2937",
-    inputBorder: "#4b5563",
-    sendButtonBg: "#4f46e5",
+    botBubbleBg: "#DFF1E9",    // ✅ Updated soft green for bot bubble
+    botBubbleColor: "#000000", // Black text for readability
+    inputBg: "#111827",
+    inputBorder: "#263746",    // Dark grey border
+    inputText: "#ffffff",      // White text in dark mode
+    sendButtonBg: "#263746",   // Dark grey send button
     sendButtonDisabledBg: "#374151",
     sendButtonColor: "white",
   },
@@ -78,6 +80,12 @@ function App() {
   const [theme, setTheme] = useState("light");
 
   const currentTheme = themes[theme];
+  const messagesEndRef = useRef(null);
+
+  // 🔥 Auto-scroll when messages update
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   const send = async () => {
     const question = input.trim();
@@ -219,12 +227,16 @@ function App() {
                 </div>
               </div>
             ))}
+
             {/* Typing indicator */}
             {loading && (
               <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: "1rem" }}>
                 <TypingIndicator color={{ bg: currentTheme.botBubbleBg, text: currentTheme.botBubbleColor }} />
               </div>
             )}
+
+            {/* 🔥 Auto-scroll target */}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input area */}
@@ -248,7 +260,7 @@ function App() {
                 borderRadius: "20px",
                 border: `1px solid ${currentTheme.inputBorder}`,
                 backgroundColor: currentTheme.inputBg,
-                color: currentTheme.botBubbleColor,
+                color: currentTheme.inputText,
                 fontSize: "1rem",
                 outline: "none",
                 transition: "border-color 0.3s, box-shadow 0.3s, background-color 0.5s, color 0.5s"

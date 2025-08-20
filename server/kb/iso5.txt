@@ -1,0 +1,196 @@
+
+
+# ISO 22000:2018 – Food Safety Management System (FSMS)
+
+ Overview
+
+ISO 22000:2018 specifies requirements for a food safety management system that enables organizations in the food chain to:
+
+ Consistently provide safe food products for consumption
+ Prevent food-borne hazards and illnesses
+ Demonstrate compliance with statutory, regulatory, and customer requirements
+ Improve overall food safety performance
+
+It applies to all organizations in the food chain, regardless of size or complexity – from primary producers to transporters, processors, retailers, and food-service outlets.
+
+---
+
+ Key Benefits
+
+ Reduced risk of food-borne hazards and contamination
+ Compliance with international food safety regulations and legal requirements
+ Increased customer confidence and satisfaction
+ Better integration of HACCP (Hazard Analysis and Critical Control Points) into management system
+ Reduced recalls, waste, and production losses
+ Improved supplier and stakeholder relationships
+ Stronger market access and competitive advantage
+ Enhanced traceability and crisis management
+
+---
+
+ High Level Structure (HLS)
+
+ Clause 4: Context of the Organization
+
+4.1 Understanding the Organization and Its Context
+Identify internal and external factors that impact food safety objectives.
+
+4.2 Understanding the Needs and Expectations of Interested Parties
+Interested parties may include:
+
+ Customers and consumers
+ Regulators and food safety authorities
+ Suppliers and subcontractors
+ Employees
+ Food safety certification bodies
+ Community and stakeholders
+
+4.3 Determining the Scope of the FSMS
+Define food chain activities, products, processes, and locations covered by FSMS.
+
+4.4 Food Safety Management System
+Establish, implement, maintain, and continually improve FSMS.
+
+---
+
+ Clause 5: Leadership
+
+5.1 Leadership and Commitment
+Top management must:
+
+ Take responsibility for FSMS effectiveness
+ Ensure food safety policy and objectives are established
+ Provide necessary resources
+ Promote continual improvement and food safety culture
+
+5.2 Food Safety Policy
+Policy must:
+
+ Be appropriate to organization’s purpose and context
+ Provide safe food for consumption
+ Comply with applicable laws and regulations
+ Support continual improvement
+ Be communicated, understood, and maintained
+
+5.3 Organizational Roles, Responsibilities, and Authorities
+Clearly define roles for food safety, hazard control, monitoring, and reporting.
+
+---
+
+ Clause 6: Planning
+
+6.1 Actions to Address Risks and Opportunities
+Identify and control food safety risks and opportunities.
+
+6.2 Food Safety Objectives and Planning
+Objectives must be measurable, consistent with policy, and monitored.
+
+6.3 Planning of Changes
+Ensure changes do not negatively affect food safety.
+
+---
+
+ Clause 7: Support
+
+7.1 Resources – Provide sufficient personnel, infrastructure, and technology for FSMS.
+7.2 Competence – Ensure workers are trained in hygiene, hazard control, and food safety practices.
+7.3 Awareness – Employees must be aware of:
+
+ Food safety policy and objectives
+ Hazards and control points
+ Consequences of unsafe practices
+
+7.4 Communication
+
+ Internal – Between staff, departments, and management
+ External – With suppliers, customers, regulators, and stakeholders
+
+7.5 Documented Information – Maintain HACCP plans, monitoring records, traceability documents, and recall procedures.
+
+---
+
+ Clause 8: Operation
+
+8.1 Operational Planning and Control
+Implement processes needed to provide safe food.
+
+8.2 Prerequisite Programmes (PRPs)
+Basic hygiene and operational conditions (ISO/TS 22002 series) – e.g.:
+
+ Cleaning and sanitation
+ Pest control
+ Personal hygiene
+ Preventive maintenance
+ Waste management
+
+8.3 Traceability System
+Ability to trace product batches from suppliers through production to customers.
+
+8.4 Emergency Preparedness and Response
+Plans for handling food safety emergencies (e.g., contamination, recalls).
+
+8.5 Hazard Control (HACCP Principles)
+
+ Hazard analysis (biological, chemical, physical hazards)
+ Establish Critical Control Points (CCPs)
+ Define critical limits for each CCP
+ Monitoring procedures
+ Corrective actions
+ Verification procedures
+ Documentation and record keeping
+
+8.6 Control of Externally Provided Processes, Products, and Services
+Ensure suppliers meet food safety requirements.
+
+8.7 Control of Nonconforming Products and Processes
+Prevent unsafe food from reaching consumers (withdrawal/recall system).
+
+8.8 Verification Activities
+Regular testing, monitoring, and auditing of FSMS.
+
+---
+
+ Clause 9: Performance Evaluation
+
+9.1 Monitoring, Measurement, Analysis, and Evaluation – Define KPIs for food safety.
+9.2 Internal Audit – Regular audits to verify compliance with ISO 22000 and HACCP.
+9.3 Management Review – Top management reviews FSMS for adequacy and effectiveness.
+
+---
+
+ Clause 10: Improvement
+
+10.1 Nonconformity and Corrective Action – Investigate incidents, take corrective actions, and prevent recurrence.
+10.2 Continual Improvement – Enhance FSMS performance continuously.
+10.3 Update FSMS – Reflect new technologies, regulations, and food safety trends.
+
+---
+
+ Common Food Safety Hazards
+
+ Biological Hazards
+
+ Bacteria (Salmonella, Listeria, E. coli, Campylobacter)
+ Viruses (Norovirus, Hepatitis A)
+ Parasites (Giardia, Trichinella)
+ Molds, yeasts, fungi
+ Spoilage organisms
+
+ Chemical Hazards
+
+ Pesticide residues
+ Heavy metals (lead, mercury)
+ Mycotoxins (aflatoxins)
+ Food additives in excess
+ Cleaning agent residues
+ Allergens (gluten, nuts, dairy, soy, shellfish)
+
+ Physical Hazards
+
+ Glass, metal fragments, stones
+ Plastic pieces
+ Bone fragments
+ Packaging material contamination
+
+
+

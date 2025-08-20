@@ -2,7 +2,8 @@
   "name": "iso-bot-web",
   "private": true,
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+      "start": "vite"
   },
   "dependencies": {
     "react": "^18.3.1",
