@@ -116,7 +116,7 @@ export default function ChatScreenMui() {
         { icon: "/worksheets.svg", label: "Worksheets" },
     ];
 
-    const API_BASE = "http://api.luna.flowergrid.co.uk";
+    const API_BASE = "https://api.luna.flowergrid.co.uk";
 
     useEffect(() => {
         try {
