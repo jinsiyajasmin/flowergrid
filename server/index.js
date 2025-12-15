@@ -15,10 +15,27 @@ const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
 const KB_EMBED_CHUNK_OVERLAP = 200;
 
+const allowedOrigins = [
+  'https://luna.flowergrid.co.uk',
+  'https://api.luna.flowergrid.co.uk'
+];
+
 app.use(cors({
-  origin: ['https://luna.flowergrid.co.uk', 'https://api.luna.flowergrid.co.uk'],
+  origin: function (origin, callback) {
+    
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('CORS not allowed'), false);
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
 app.use(express.json());
 
 app.use((req, res, next) => {
