@@ -16,7 +16,7 @@ const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 
 const KB_EMBED_CHUNK_OVERLAP = 200;
 
 app.use(cors({
-  origin: ['http://luna.flowergrid.co.uk', 'http://api.luna.flowergrid.co.uk'],
+  origin: ['https://luna.flowergrid.co.uk', 'https://api.luna.flowergrid.co.uk'],
   credentials: true
 }));
 app.use(express.json());
