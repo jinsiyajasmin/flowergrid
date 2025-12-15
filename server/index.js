@@ -8,394 +8,315 @@ import OpenAI from 'openai';
 
 const app = express();
 
-// ----------------- Configuration (use existing env vars only) -----------------
 const PORT = process.env.PORT || 3001;
-const KB_DIR = path.resolve('./kb'); // DO NOT change to a new env var
+const KB_DIR = path.resolve('./kb');
 const KB_EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
-const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10); // same env var name as before
-const KB_EMBED_CHUNK_OVERLAP = 200; // kept as a constant (not an env var)
-const RETRIEVE_TOP_K = 3; // constant, not env var
-const RETRIEVE_MIN_SCORE = 0.55; // constant, not env var
-const SESSION_MAX_MESSAGES = 8; // constant, not env var
-// ------------------------------------------------------------------------------
+const SESSION_MAX_MESSAGES = 8;
+const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
+const KB_EMBED_CHUNK_OVERLAP = 200;
 
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:5174'],
+  origin: ['http://localhost:3001', 'http://localhost:5173'],
   credentials: true
 }));
 app.use(express.json());
 
-// Basic security header
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   next();
 });
 
 const openai = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_BASE_URL || process.env.DEEPSEEK_BASE_URL || undefined,
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_BASE_URL || undefined
 });
 
-if (!openai.apiKey && !process.env.DEEPSEEK_BASE_URL) {
-  console.warn('⚠️ OpenAI/API key or base URL not set. The server will still run but embedding/chat calls will fail until keys are provided.');
+let KB_TEXTS = [];
+
+
+async function embedText(text) {
+  const chunks = chunkText(text);
+  const embeddings = [];
+  for (const chunk of chunks) {
+    const resp = await openai.embeddings.create({
+      model: KB_EMBED_MODEL,
+      input: chunk
+    });
+    embeddings.push(resp?.data?.[0]?.embedding);
+  }
+  return avgEmbeddings(embeddings);
 }
 
-// ---------- In-memory KB index ----------
-let KB_TEXTS = []; // { file, text, wordsSet, embedding }
-// -------------------------------------------------
+function avgEmbeddings(embs) {
+  if (!embs.length) return [];
+  const dim = embs[0].length;
+  const avg = new Array(dim).fill(0);
+  for (const v of embs) {
+    for (let i = 0; i < dim; i++) {
+      avg[i] += v[i];
+    }
+  }
+  for (let i = 0; i < dim; i++) {
+    avg[i] /= embs.length;
+  }
+  return avg;
+}
 
-// Utility: naive chunker for long texts (keeps overlap)
 function chunkText(text, limit = KB_EMBED_SLICE_LIMIT, overlap = KB_EMBED_CHUNK_OVERLAP) {
-  if (!text || text.length <= limit) return [text];
+  if (text.length <= limit) return [text];
   const chunks = [];
   let start = 0;
   while (start < text.length) {
     const end = Math.min(text.length, start + limit);
     chunks.push(text.slice(start, end));
     if (end === text.length) break;
-    start = Math.max(0, end - overlap);
+    start = end - overlap;
   }
   return chunks;
 }
 
-// Embedding: embed multiple chunks and average the vectors
-async function embedText(text) {
-  const inputText = typeof text === 'string' ? text : String(text || '');
-  const chunks = chunkText(inputText, KB_EMBED_SLICE_LIMIT, KB_EMBED_CHUNK_OVERLAP);
-
-  const embeddings = [];
-  for (const chunk of chunks) {
-    try {
-      const resp = await openai.embeddings.create({
-        model: KB_EMBED_MODEL,
-        input: chunk
-      });
-      const emb = resp?.data?.[0]?.embedding || null;
-      if (emb) embeddings.push(emb);
-    } catch (err) {
-      console.warn('Embedding chunk failed:', err?.message || err);
-      // continue embedding remaining chunks
-    }
-  }
-
-  if (embeddings.length === 0) return null;
-
-  // average embeddings element-wise
-  const dim = embeddings[0].length;
-  const avg = new Array(dim).fill(0);
-  for (const emb of embeddings) {
-    for (let i = 0; i < dim; i++) avg[i] += emb[i];
-  }
-  for (let i = 0; i < dim; i++) avg[i] /= embeddings.length;
-  return avg;
-}
-
-function cosine(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-12);
-}
-
-// Build KB index - reads .txt/.md files and stores text + embedding
 async function buildIndex() {
   KB_TEXTS = [];
   try {
     await fs.access(KB_DIR);
   } catch {
     await fs.mkdir(KB_DIR, { recursive: true });
-    console.log(`📁 KB directory created at ${KB_DIR}. Add your notes as .txt or .md files.`);
     return;
   }
-
   const files = (await fs.readdir(KB_DIR)).filter(f => /\.(txt|md)$/i.test(f));
-  console.log(`📚 Found ${files.length} KB file(s):`, files);
   for (const f of files) {
-    try {
-      const full = await fs.readFile(path.join(KB_DIR, f), 'utf8');
-      const content = full.trim();
-      const wordsSet = new Set(
-        content
-          .toLowerCase()
-          .replace(/[^\w\s]/g, ' ')
-          .split(/\s+/)
-          .filter(Boolean)
-      );
-
-      let embedding = null;
-      try {
-        embedding = await embedText(content);
-      } catch (err) {
-        console.warn(`⚠️ embedding failed for ${f}:`, err?.message || err);
-      }
-
-      KB_TEXTS.push({ file: f, text: content, wordsSet, embedding });
-    } catch (err) {
-      console.error('Error reading KB file', f, err);
-    }
+    const full = await fs.readFile(path.join(KB_DIR, f), 'utf8');
+    const trimmed = full.trim();
+    if (!trimmed) continue;
+    KB_TEXTS.push({
+      file: f,
+      text: trimmed,
+      embedding: await embedText(trimmed)
+    });
   }
-
-  console.log(`✅ Loaded ${KB_TEXTS.length} KB files:`, KB_TEXTS.map(k => k.file));
 }
 
-// A slightly broader intent classifier and fallback for unknowns
-function classifyIntent(question) {
-  const q = (question || '').toLowerCase();
-  if (/\b(weather|temperature|forecast|rain|sunny|cloud|wind)\b/.test(q)) return 'weather';
-  if (/\b(news|breaking|headline|latest news)\b/.test(q)) return 'news';
-  if (/\b(stock|share price|price of|ticker|nasdaq|nyse)\b/.test(q)) return 'finance';
-  if (/\b(time in|what time|local time)\b/.test(q)) return 'time';
-  if (/\b(direction|how to get|route|map|where is)\b/.test(q)) return 'directions';
-  return 'default';
-}
-
-// Improved self-harm detection (wider phrase coverage)
-function detectSelfHarm(text) {
-  const q = (text || '').toLowerCase();
-  const pattern = /\b(kill myself|suicid|end my life|hurt myself|i want to die|i'll die|i will die|i'm going to die|want to die|i can't go on|no reason to live|don't want to live)\b/;
-  return pattern.test(q);
-}
-
-// retrieve top KB matches using cosine similarity
-async function retrieveTopKB(query, topK = RETRIEVE_TOP_K, minScore = RETRIEVE_MIN_SCORE) {
-  if (!KB_TEXTS || KB_TEXTS.length === 0) return [];
-
-  let qemb = null;
-  try {
-    qemb = await embedText(query);
-  } catch (err) {
-    console.error('Embedding query failed:', err);
-    return [];
+function cosine(a, b) {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
   }
-  if (!qemb) return [];
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
 
+async function retrieveTopKB(query) {
+  if (!KB_TEXTS.length) return [];
+  const qemb = await embedText(query);
+  if (!qemb.length) return [];
   const scored = KB_TEXTS
-    .map(k => ({ file: k.file, text: k.text, score: k.embedding ? cosine(qemb, k.embedding) : 0 }))
+    .map(k => ({
+      file: k.file,
+      text: k.text,
+      score: cosine(qemb, k.embedding)
+    }))
     .sort((a, b) => b.score - a.score);
-
-  const filtered = scored.filter(s => s.score >= minScore);
-  const result = filtered.slice(0, topK);
-  if (result.length === 0 && scored.length > 0) {
-    if (scored[0].score > 0.35) return [scored[0]];
-    return [];
-  }
-  return result;
+  return scored[0]?.score >= 0.55 ? [scored[0]] : [];
 }
 
-function prettyTextFromModel(raw) {
-  if (!raw || typeof raw !== 'string') return '';
-  let text = raw.replace(/\r\n/g, '\n').trim();
-  const lines = text.split(/\n+/).map(s => s.trim()).filter(Boolean).map(s => {
-    if (!/[.!?]$/.test(s)) s = s + '.';
-    return s.charAt(0).toUpperCase() + s.slice(1);
-  });
-  return lines.join('\n\n');
+
+function detectSelfHarm(text) {
+  return /\b(kill myself|suicid|end my life|hurt myself|want to die|take my own life)\b/i.test(text);
 }
 
-// Conversation call helper
-async function callConversation(systemMessage, messagesArray, options = {}) {
-  const model = options.model || process.env.CHAT_MODEL || 'deepseek-chat';
-  const temperature = options.temperature ?? 0.2;
-  const max_tokens = options.max_tokens ?? 1200;
-  const messages = Array.isArray(messagesArray) ? messagesArray : [{ role: 'user', content: messagesArray }];
-
-  if (systemMessage && typeof systemMessage === 'string') {
-    messages.unshift({ role: 'system', content: systemMessage });
-  }
-
-  const response = await openai.chat.completions.create({
-    model,
-    messages,
-    temperature,
-    max_tokens,
-  });
-
-  const text = (response?.choices?.[0]?.message?.content ?? "").toString();
-  return text;
+function detectDistress(text) {
+  return /\b(feel down|sad|anxious|anxiety|stress|stressed|panic|panicking|worried|worry|low|struggling|not okay|not ok|overwhelmed?)\b/i.test(text);
 }
 
-// Session context storage
+function detectMedicalDiagnosis(text) {
+  return /\b(diagnos|symptom|symptoms|what is wrong with me|do i have|is this anxiety|is this depression|medical advice|medication|treatment for|treat this)\b/i.test(text);
+}
+
+function detectPricing(text) {
+  return /\b(price|cost|how much|fees?|pricing|charges?)\b/i.test(text);
+}
+
+
 const SESSION_CONTEXT = new Map();
+
 function addToSession(sessionId, role, content) {
   if (!sessionId) return;
   const arr = SESSION_CONTEXT.get(sessionId) || [];
-  arr.push({ role, content, ts: Date.now() });
-  const sliced = arr.slice(-SESSION_MAX_MESSAGES);
-  SESSION_CONTEXT.set(sessionId, sliced);
+  arr.push({ role, content });
+  SESSION_CONTEXT.set(sessionId, arr.slice(-SESSION_MAX_MESSAGES));
 }
+
 function getSessionMessages(sessionId) {
+  if (!sessionId) return [];
   return SESSION_CONTEXT.get(sessionId) || [];
 }
 
-// Initial build
-await buildIndex();
 
-// Watch KB directory for changes and rebuild index automatically
-try {
-  if (fsSync.existsSync(KB_DIR)) {
-    fsSync.watch(KB_DIR, { persistent: true }, async (eventType, filename) => {
-      if (!filename) return;
-      console.log(`📣 KB change detected (${eventType}): ${filename}. Rebuilding index...`);
-      try {
-        await buildIndex();
-      } catch (err) {
-        console.error('Error rebuilding KB after file change:', err);
-      }
-    });
+const FLORA_PROMPT = `
+You are Flora, the friendly and supportive chatbot for FlowerGrid, a holistic wellness centre in the UK.
+• Never write long paragraphs. Maximum 2–3 sentences per reply, always concise.
+
+IDENTITY AND ROLE
+- You are a warm, thoughtful companion who offers emotional support and practical guidance.
+- You are not a doctor, therapist or medical professional.
+- Your job is to listen first, reflect what you have heard, validate the person's feelings and then offer something genuinely useful.
+
+PERSONALITY AND TONE
+- Warm, calm, grounded, curious, attentive and non judgemental.
+- Professional but approachable, like a kind, steady human.
+- Always use British English.
+- Use simple, clear language and short paragraphs.
+- Do not sound robotic, clinical or overly formal.
+- Do not use clichés such as "unlock your potential" or "journey to wellness".
+- Never say "I understand how you feel" because you cannot fully know their experience.
+- Do not overuse exclamation marks and avoid emojis.
+- Do not use em dashes.
+
+CORE PRINCIPLE
+Every response should:
+1) Reflect what you heard in your own words so they feel heard.
+2) Validate their feelings and normalise the struggle without minimising it.
+3) Offer at least one practical tip, technique, question or perspective that can help them move forward.
+
+CONVERSATION FLOW
+- Early messages: greet warmly and gently ask what brought them here today; let them share. You may offer one small insight or grounding idea.
+- Next messages: reflect their words, validate their experience and offer a specific technique, question or reframe.
+- Later: deepen support, offer different angles if they feel stuck and check in on how they are feeling now.
+- Only bring up FlowerGrid services naturally when it fits, usually after several messages, or if they ask about getting further help, therapy, coaching or FlowerGrid itself.
+- If you mention services, keep it soft and never pushy or sales driven.
+
+TECHNIQUES YOU CAN OFFER
+Use or adapt these where relevant to the user:
+- For stress and overwhelm: grounding with the 5-4-3-2-1 senses, a brain dump on paper, a prioritising question such as "What is one thing today that would make everything else a bit easier?", and box breathing (in 4, hold 4, out 4, hold 4).
+- For anxiety and racing thoughts: naming the feeling ("I notice I am feeling anxious"), the 5-4-3-2-1 method, a daily worry window, and slow breathing with longer exhales (in 4, out 6 or 8).
+- For feeling stuck or lost: clarity questions about what they would like life to look like in a year, exploring values, choosing the tiniest next step, or giving themselves permission to pause instead of pushing.
+- For low mood: focusing on one small win, self compassion (what they would say to a close friend), a few minutes of gentle movement, and small moments of connection such as a short message to someone they trust.
+- For relationship struggles: perspective taking about what the other person might be feeling, using "I" statements instead of blame, reflecting on boundaries that protect their energy, and asking what they actually need from the relationship.
+- For work or career stress: an energy audit (what drains and what restores), small boundaries around work (for example, not checking emails after a certain time), focusing on what is in their control, and reconnecting with what originally drew them to the work.
+- For sleep difficulties: a simple wind down routine, writing thoughts down before bed to offload the mind, and a slow body scan to release tension.
+- For confidence and self doubt: gathering evidence from past times they handled something difficult, noticing the inner critic and asking whether it is helpful, and choosing a small action that gently stretches their comfort zone.
+
+FLOWERGRID CONTEXT
+- FlowerGrid is a holistic wellness centre founded by Samina Khan in the UK.
+- FlowerGrid integrates medical science with holistic practices to support the whole person: mind, body and spirit.
+- There is a team of doctors, therapists, coaches and certified practitioners.
+- Sessions are available both online and in person in the UK.
+- Main service areas:
+  1) Life Coaching and Transformation: personal and professional growth, relationship coaching, conscious living, leadership and soft skills.
+  2) Therapeutic and Mental Wellness: anxiety and stress management, NLP, psychological therapy, hypnotherapy.
+  3) Medical and Aesthetic Wellness: medical checks, doctor consultations, aesthetics, nutrition advice and integrative health and fitness plans.
+  4) Holistic and Energy Healing: meditation, mindfulness, breathing, Reiki, colour therapy, auricular acupuncture and soul reflection work.
+- When relevant, you may gently suggest which of these areas might suit their needs and mention that they can contact FlowerGrid for deeper support, but never push and never overdo it.
+
+BOUNDARIES
+- Do not diagnose or prescribe and do not give specific medical advice.
+- If they ask for a diagnosis or medical opinion, kindly say you cannot provide medical advice and recommend they speak to a qualified healthcare professional. You may mention that FlowerGrid has doctors and medical practitioners who can support them.
+- If they ask for pricing details, explain that you do not have pricing to hand and that the FlowerGrid team can help at sk@flowergrid.co.uk or +44 7432 211096.
+
+STYLE
+- Aim for about 3 to 5 sentences per reply.
+- Use short paragraphs so your replies are easy to read.
+- Always leave the user feeling both heard and helped, not just listened to.
+- Where it fits, end with a gentle question or invitation to share more.
+`;
+
+
+async function chatWithFlora(history, userMessage, options = {}) {
+  const { distressFlag = false } = options;
+
+  const extraDistressInstruction = distressFlag
+    ? '\nThe user seems distressed or overwhelmed. Be especially gentle, calming and grounding in your reply.'
+    : '';
+
+  let kbContext = '';
+  const kbMatches = await retrieveTopKB(userMessage);
+  if (kbMatches.length) {
+    const top = kbMatches[0];
+    kbContext =
+      `\n\nAdditional FlowerGrid reference information (from ${top.file}):\n` +
+      top.text.slice(0, 2000); 
   }
-} catch (err) {
-  console.warn('KB watch setup failed:', err?.message || err);
+
+  const systemContent = FLORA_PROMPT + extraDistressInstruction + kbContext;
+
+  const fullMessages = [
+    { role: 'system', content: systemContent },
+    ...history,
+    { role: 'user', content: userMessage }
+  ];
+
+  const resp = await openai.chat.completions.create({
+    model: process.env.CHAT_MODEL || 'gpt-4.1',
+    messages: fullMessages,
+    temperature: 0.3,
+    max_completion_tokens: 220
+  });
+
+  return resp?.choices?.[0]?.message?.content?.trim() || 'I am here with you. Tell me more about what is on your mind.';
 }
 
-// heuristic: detect persona-like queries
-function isLikelyPersonaQuery(message) {
-  const q = (message || '').toLowerCase();
-  if (/\bflora\b/.test(q)) return true;
-  if (/\b(privacy|crisis|resources|session|confidential|how do you|what can you do|boundaries|limits)\b/.test(q)) return true;
-  return false;
-}
 
-// ---------- Helper endpoints ----------
-app.get('/kb/list', async (req, res) => {
-  try {
-    const files = KB_TEXTS.map(k => k.file);
-    return res.json({ files, count: files.length });
-  } catch (err) {
-    return res.status(500).json({ error: 'Failed to list KB files', detail: err?.message });
-  }
-});
-
-app.post('/kb/reload', async (req, res) => {
-  try {
-    await buildIndex();
-    return res.json({ ok: true, loaded: KB_TEXTS.length });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: err?.message || String(err) });
-  }
-});
-
-// ---------- /chat endpoint ----------
 app.post('/chat', async (req, res) => {
   try {
     const { message, sessionId } = req.body;
-    if (!message) return res.status(400).json({ error: 'Message required' });
 
-    // ensure KB loaded
-    if (KB_TEXTS.length === 0) await buildIndex();
-
-    // immediate safety
-    if (detectSelfHarm(message)) {
-      const escalate = `I'm really sorry you're feeling so distressed. I can't provide crisis services. If you are thinking about harming yourself or are in immediate danger, please contact your local emergency number right now or a crisis line. Would you like me to show local emergency numbers or connect you to a human now?`;
-      return res.json({ answer: escalate, meta: { source: 'escalation', escalation: true } });
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message required' });
     }
 
-    // out-of-domain intent
-    const intent = classifyIntent(message);
-    if (intent !== 'default') {
-      const fallback = {
-        weather: `I don't know the current weather. Try checking a weather site or app.`,
-        news: `I can't fetch live news. Try a news site.`,
-        finance: `I don't have live stock data.`,
-        time: `I can't read current local time.`,
-        directions: `I can't provide live directions. Use a maps service.`,
-      }[intent] || `I can't help with that right now.`;
-      return res.json({ answer: fallback, meta: { source: 'fallback', intent }});
+    if (!KB_TEXTS.length) {
+      await buildIndex();
     }
 
-    if (sessionId) addToSession(sessionId, 'user', message);
+    const text = message.trim();
 
-    // KB retrieval
-    let topMatches = [];
-    try {
-      topMatches = await retrieveTopKB(message, RETRIEVE_TOP_K, RETRIEVE_MIN_SCORE);
-    } catch (err) {
-      console.warn('retrieveTopKB error:', err?.message || err);
+    if (detectSelfHarm(text)) {
+      const crisis =
+        'Thank you for sharing that with me. What you are going through sounds really difficult, and I want you to know that support is available right now.\n\n' +
+        'If you are in the UK, please consider contacting one of these services:\n' +
+        '- Samaritans: 116 123 (free, 24 hours)\n' +
+        '- Crisis Text Line: Text SHOUT to 85258\n' +
+        '- Mind Infoline: 0300 123 3393\n\n' +
+        'You do not have to face this alone. Speaking to a trained person can make a real difference.';
+      return res.json({ answer: crisis });
     }
 
-    const personaQuery = isLikelyPersonaQuery(message);
-
-    if ((topMatches && topMatches.length > 0) || personaQuery) {
-      const topKBtext = (topMatches && topMatches.length > 0)
-        ? topMatches.map(m => `File: ${m.file}\n\n${m.text}`).join('\n\n---\n\n')
-        : (KB_TEXTS.find(k => k.file.toLowerCase().includes('persona'))?.text || '');
-
-      const systemMsg = `You are Flora, a licensed psychologist who practices evidence-based therapy with emphasis on logotherapy (meaning-centered). Use the knowledge provided in the 'Knowledge base' section to answer questions about Flora's persona, therapy style, boundaries, crisis protocols, resources, and example dialogues. If the question is clinical or asks for diagnosis, say "I can't provide medical advice; please consult a healthcare professional." Use empathic tone, ask clarifying questions, make a concise direct observation and ask the user to validate its accuracy, weave in gentle meaning-focused prompts, and always end your reply with a probing question. If the exact answer is not present in the KB, reply: "I don't know." Do not invent facts. Do not provide legal or medical instructions.`;
-
-      const sessionMsgs = getSessionMessages(sessionId);
-      const messages = [
-        { role: 'system', content: systemMsg },
-        { role: 'system', content: `Knowledge base:\n\n${topKBtext}` },
-      ];
-      for (const m of sessionMsgs) messages.push({ role: m.role, content: m.content });
-      messages.push({ role: 'user', content: message });
-
-      let modelText;
-      try {
-        modelText = await callConversation(null, messages, { temperature: 0.05, max_tokens: 1100 });
-      } catch (err) {
-        console.error('Chat error (KB path):', err?.message || err);
-        return res.status(500).json({ error: 'Model error', detail: err?.message || String(err) });
-      }
-
-      const normalized = modelText.replace(/\r\n/g, '\n').trim();
-      const lower = normalized.toLowerCase();
-
-      if (lower === "i don't know" || lower === "i don't know." || lower.includes("i can only answer")) {
-        const fallbackSystem = `You are Flora, a compassionate psychologist specializing in logotherapy. Validate feelings, ask a clarifying question, offer gentle meaning-centered reflection, and always end with a probing question. If medical advice is requested, decline and offer to find resources.`;
-        const fallbackMessages = [
-          { role: 'system', content: fallbackSystem },
-          { role: 'user', content: message }
-        ];
-        let fallbackText;
-        try {
-          fallbackText = await callConversation(null, fallbackMessages, { temperature: 0.18, max_tokens: 800 });
-        } catch (err) {
-          console.error('Fallback chat error:', err);
-          return res.status(500).json({ error: 'Model error', detail: err?.message || String(err) });
-        }
-        const pretty = prettyTextFromModel(fallbackText);
-        if (sessionId) addToSession(sessionId, 'assistant', pretty);
-        return res.json({ answer: pretty, meta: { source: 'fallback', kbHit: false } });
-      }
-
-      const pretty = prettyTextFromModel(normalized);
-      if (sessionId) addToSession(sessionId, 'assistant', pretty);
-      return res.json({ answer: pretty, meta: { source: 'kb', kbHit: true, matches: topMatches.map(m => ({file:m.file, score:m.score})) } });
+    if (detectMedicalDiagnosis(text)) {
+      const medicalReply =
+        'I am not able to provide medical advice or a diagnosis. For anything related to your physical or mental health, it is always best to speak with a qualified healthcare professional who can assess your situation properly.\n\n' +
+        'FlowerGrid does have doctors and medical practitioners on the team who can support you if that would help. You can reach the team at sk@flowergrid.co.uk or call +44 7432 211096.';
+      return res.json({ answer: medicalReply });
     }
 
-    // Standard wellness path
-    const wellnessSystem = `You are Flora, a licensed psychologist who uses evidence-based therapy and logotherapy (meaning-centered). Always validate the user's feelings briefly, ask a clarifying question, offer a concise observation and ask the user to validate it, weave in gentle meaning-focused prompts and end every reply with a probing question. If the user asks for medical diagnoses, refuse and offer resources. Maintain unconditional positive regard.`;
-
-    const sessionMsgs = getSessionMessages(sessionId);
-    const messages = [{ role: 'system', content: wellnessSystem }, ...sessionMsgs.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: message }];
-
-    let aiText;
-    try {
-      aiText = await callConversation(null, messages, { temperature: 0.18, max_tokens: 900 });
-    } catch (err) {
-      console.error('Chat error (wellness):', err);
-      return res.status(500).json({ error: 'Model error', detail: err?.message || String(err) });
+    if (detectPricing(text)) {
+      const pricingReply =
+        'I do not have specific pricing details to hand. The FlowerGrid team would be happy to talk you through options, availability and fees.\n\n' +
+        'You can contact them by email at sk@flowergrid.co.uk or by phone on +44 7432 211096.';
+      return res.json({ answer: pricingReply });
     }
 
-    const pretty = prettyTextFromModel(aiText);
-    if (sessionId) addToSession(sessionId, 'assistant', pretty);
-    return res.json({ answer: pretty, meta: { source: 'ai', escalation: false } });
+    const history = getSessionMessages(sessionId).map(m => ({
+      role: m.role,
+      content: m.content
+    }));
 
+    const distressFlag = detectDistress(text);
+
+    const reply = await chatWithFlora(history, text, { distressFlag });
+
+    addToSession(sessionId, 'user', text);
+    addToSession(sessionId, 'assistant', reply);
+
+    res.json({ answer: reply });
   } catch (err) {
-    console.error('Unhandled server error:', err);
-    res.status(500).json({ error: 'Server error', detail: err?.message });
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
+
 app.listen(PORT, async () => {
-  try {
-    await buildIndex();
-  } catch (err) {
-    console.warn('Initial KB build failed:', err?.message || err);
-  }
-  console.log(`🚀 Flora assistant server running on http://localhost:${PORT}`);
+  await buildIndex();
+  console.log(`🌼 Flora is live at http://localhost:${PORT}`);
 });
