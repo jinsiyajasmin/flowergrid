@@ -314,6 +314,40 @@ export default function ChatScreenMui() {
         }
     }
 
+
+    function VoiceRecordingLine() {
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        left: 16,
+        right: 64,
+        bottom: 6,
+        height: 3,
+        borderRadius: 2,
+        overflow: "hidden",
+        background: "rgba(80,57,32,0.15)",
+      }}
+    >
+      <Box
+        sx={{
+          width: "40%",
+          height: "100%",
+          background: "#503920",
+          animation: "voiceWave 1.2s infinite ease-in-out",
+        }}
+      />
+      <style>{`
+        @keyframes voiceWave {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(150%); }
+          100% { transform: translateX(300%); }
+        }
+      `}</style>
+    </Box>
+  );
+}
+
     async function sendChatSummary() {
         try {
             const sessionId = sessionStorage.getItem("flora_session_id");
@@ -905,14 +939,11 @@ export default function ChatScreenMui() {
                                 px: 2,
                             }}
                         >
-                            I'm Flora,{" "}
+                            I'm Luna,{" "}
                             <Box component="span" sx={{ fontWeight: 400 }}>
                                 your AI Mental Health Companion
                             </Box>
                         </Typography>
-<button onClick={() => window.location.href = "/admin"}>
-  Go Admin
-</button>
 
                         <Typography
                             variant="h6"
@@ -949,11 +980,11 @@ export default function ChatScreenMui() {
                                 }}
                             >
                                 <Box sx={{ position: "relative", flex: 1 }}>
-                                    <TextField
+                              <TextField
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={onKeyDown}
-                                        placeholder="Start typing here..."
+                                        placeholder={isListening ? "" : "Start typing here..."}
                                         multiline={false}
                                         fullWidth
                                         variant="filled"
@@ -963,7 +994,7 @@ export default function ChatScreenMui() {
                                                 height: 54,
                                                 borderRadius: "28px",
                                                 border: "1px solid #CAA361",
-                                                pr: "64px",
+                                                pr: isListening ? "110px" : "64px",
                                                 pl: 3,
                                                 bgcolor: INPUT_BG,
                                                 display: "flex",
@@ -984,8 +1015,37 @@ export default function ChatScreenMui() {
                                                 },
                                             },
                                         }}
-                                        disabled={sending}
+                                        disabled={sending || isListening}
                                     />
+                                    
+                                    {isListening && (
+                                        <Box
+                                            sx={{
+                                                position: "absolute",
+                                                left: 24,
+                                                right: 120,
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 0.5,
+                                            }}
+                                        >
+                                            {[...Array(50)].map((_, i) => (
+                                                <Box
+                                                    key={i}
+                                                    sx={{
+                                                        width: 2,
+                                                        height: 2,
+                                                        borderRadius: "50%",
+                                                        bgcolor: "#503920",
+                                                        opacity: 0.4,
+                                                        animation: `dotFade 1.5s infinite ease-in-out ${i * 0.03}s`,
+                                                    }}
+                                                />
+                                            ))}
+                                        </Box>
+                                    )}
 
                                     {/* MIC INSIDE FIELD (hero) */}
                                     <IconButton
