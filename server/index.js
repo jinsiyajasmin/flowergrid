@@ -31,7 +31,8 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:5173'],
+  origin: ['http://localhost:3001', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
+  'https://api.luna.flowergrid.co.uk'],
   credentials: true
 }));
 
