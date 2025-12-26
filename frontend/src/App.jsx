@@ -1,16 +1,14 @@
-import { useState } from 'react'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ChatScreenMui from "./ChatScreenMui";
+import AdminDashboard from "./AdminDashboard";
 
-
-import ChatScreenMui from './ChatScreenMui'
-
-function App() {
-  
-
+export default function App() {
   return (
-    <>
-      <ChatScreenMui />
-    </>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<ChatScreenMui />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
-
-export default App

@@ -10,6 +10,13 @@ import {
     Chip,
 } from "@mui/material";
 import InteractiveSvgAvatar from "./InteractiveSvgAvatar";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import GoogleIcon from "@mui/icons-material/Google";
+import Button from "@mui/material/Button";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import Drawer from "@mui/material/Drawer";
+import MenuIcon from "@mui/icons-material/Menu";
 
 function TypingIndicator({ bg, color }) {
     return (
@@ -77,12 +84,9 @@ function getOrCreateSessionId() {
         }
         return id;
     } catch {
-        // Fallback if sessionStorage is blocked
         return "sess_fallback";
     }
 }
-
-// ---------------------------------------------------------------------------
 
 export default function ChatScreenMui() {
     const BG_GRADIENT =
@@ -97,11 +101,23 @@ export default function ChatScreenMui() {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef(null);
+    const [signupAnchorEl, setSignupAnchorEl] = useState(null);
+    const signupOpen = Boolean(signupAnchorEl);
+    const [user, setUser] = useState(null);
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+    const handleSignupClick = (event) => {
+        setSignupAnchorEl(event.currentTarget);
+    };
+
+    const handleSignupClose = () => {
+        setSignupAnchorEl(null);
+    };
+
+    const isMobile = useMediaQuery("(max-width:900px)");
     const [conversationMode, setConversationMode] = useState(false);
     const [collapsed, setCollapsed] = useState(true);
 
-    // 🔊 Speech recognition state
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
 
@@ -137,7 +153,64 @@ export default function ChatScreenMui() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, sending, conversationMode]);
 
-    // 🔊 Initialise Web Speech API
+    useEffect(() => {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const userParam = params.get("user");
+
+            if (userParam) {
+                const parsedUser = JSON.parse(decodeURIComponent(userParam));
+                localStorage.setItem("flora_user", JSON.stringify(parsedUser));
+                setUser(parsedUser);
+
+                const url = new URL(window.location.href);
+                url.searchParams.delete("user");
+                window.history.replaceState({}, document.title, url.toString());
+            } else {
+                const stored = localStorage.getItem("flora_user");
+                if (stored) setUser(JSON.parse(stored));
+            }
+        } catch (err) {
+            console.warn("User restore failed", err);
+        }
+    }, []);
+
+    useEffect(() => {
+        function handlePageLeave() {
+            const sessionId = sessionStorage.getItem("flora_session_id");
+            if (!sessionId) return;
+
+            navigator.sendBeacon(
+                "https://api.luna.flowergrid.co.uk/chat/summary",
+                JSON.stringify({ sessionId })
+            );
+        }
+
+        window.addEventListener("beforeunload", handlePageLeave);
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") {
+                handlePageLeave();
+            }
+        });
+
+        return () => {
+            window.removeEventListener("beforeunload", handlePageLeave);
+        };
+    }, []);
+
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            sendChatSummary();
+        };
+
+        window.addEventListener("beforeunload", handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener("beforeunload", handleBeforeUnload);
+            sendChatSummary();
+        };
+    }, []);
+
     useEffect(() => {
         const SpeechRecognition =
             window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -148,7 +221,7 @@ export default function ChatScreenMui() {
         }
 
         const recognition = new SpeechRecognition();
-        recognition.lang = "en-GB"; // British English
+        recognition.lang = "en-GB";
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
 
@@ -169,7 +242,6 @@ export default function ChatScreenMui() {
             const transcript = event.results[0][0].transcript?.trim();
             if (!transcript) return;
 
-            // Auto send transcript to Flora
             setConversationMode(true);
             setInput("");
             sendToServer(transcript);
@@ -184,7 +256,6 @@ export default function ChatScreenMui() {
                 // ignore
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function sendToServer(text) {
@@ -243,6 +314,30 @@ export default function ChatScreenMui() {
         }
     }
 
+    async function sendChatSummary() {
+        try {
+            const sessionId = sessionStorage.getItem("flora_session_id");
+            if (!sessionId) return;
+
+            await fetch("https://api.luna.flowergrid.co.uk/chat/summary", {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ sessionId }),
+            });
+        } catch (err) {
+            console.warn("Summary send failed", err);
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem("flora_user");
+        setUser(null);
+        handleSignupClose();
+    }
+
     function onSubmit(e) {
         e?.preventDefault();
         const trimmed = input.trim();
@@ -259,7 +354,6 @@ export default function ChatScreenMui() {
         }
     }
 
-    // 🔊 Mic click handler
     function handleMicClick() {
         const recognition = recognitionRef.current;
 
@@ -302,191 +396,463 @@ export default function ChatScreenMui() {
                 minHeight: "100vh",
                 height: "100vh",
                 background: BG_GRADIENT,
+                marginLeft: isMobile ? 0 : 0,
                 fontFamily:
                     "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
-                overflow: "hidden",
+                overflowY: "auto",
             }}
         >
             <CssBaseline />
             <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
 
-            {/* SIDEBAR */}
-            <Box
-                sx={{
-                    width: sidebarWidth,
-                    bgcolor: SIDEBAR_BG,
-                    color: "#664B2E",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    py: 3,
-                    px: collapsed ? 1 : 2,
-                    gap: 2,
-                    transition: "width 250ms ease",
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    height: "100vh",
-                    zIndex: 1300,
-                    boxSizing: "border-box",
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                }}
-            >
-                <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                    <img
-                        src="/logo.svg"
-                        alt="logo"
-                        style={{ width: collapsed ? 46 : 46, height: "auto" }}
-                    />
-                </Box>
-
-                <Box
-                    onClick={() => setCollapsed((s) => !s)}
-                    sx={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        mt: 2,
-                        mb: 2,
-                        background: "#866A4D",
-                        border: "1px solid #CAA361",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        transition: "all 250ms ease",
-                        boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
-                        "&:hover": {
-                            transform: "scale(1.05)",
-                            background: "#8b7358",
-                        },
-                    }}
-                >
-                    <Box
+            {isMobile && (
+                <>
+                    <IconButton
+                        onClick={() => setMobileDrawerOpen(true)}
                         sx={{
-                            width: 32,
-                            height: 72,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            transition: "transform 250ms ease",
-                            transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
+                            position: "fixed",
+                            top: 16,
+                            left: 16,
+                            zIndex: 2000,
+                            bgcolor: "#fff",
+                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
                         }}
                     >
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                        >
-                            <path
-                                d="M9 6L15 12L9 18"
-                                stroke="white"
-                                strokeWidth="1.3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </Box>
-                </Box>
+                        <MenuIcon />
+                    </IconButton>
 
-                <Box
-                    sx={{
-                        mt: 1,
-                        width: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1.5,
-                    }}
-                >
-                    {menuItems.map(({ icon, label }, index) => (
-                        <Box
-                            key={label}
-                            onClick={index === 0 ? goToHome : undefined}
-                            sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                px: collapsed ? 0 : 1,
-                                justifyContent: collapsed ? "center" : "flex-start",
-                                cursor: index === 0 ? "pointer" : "default",
-                            }}
-                        >
-                            <IconButton
-                                sx={{
-                                    color: "#EDDBBF",
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: 2,
-                                    justifyContent: "center",
-                                    "&:hover": {
-                                        background: "rgba(255,255,255,0.1)",
-                                    },
-                                }}
-                            >
-                                <img
-                                    src={icon}
-                                    alt={label}
-                                    style={{
-                                        width: 22,
-                                        height: 22,
-                                        objectFit: "contain",
-                                        filter: "brightness(0) invert(1)",
+                    <Box
+                        sx={{
+                            position: "fixed",
+                            top: 16,
+                            right: 16,
+                            zIndex: 2000,
+                        }}
+                    >
+                        {user ? (
+                            <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                                <Box
+                                    component="img"
+                                    src={user.avatar}
+                                    alt={user.name}
+                                    sx={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: "50%",
+                                        border: "2px solid #CAA361",
+                                        objectFit: "cover",
                                     }}
                                 />
                             </IconButton>
-                            {!collapsed && (
-                                <Typography
-                                    sx={{
-                                        fontSize: 13,
-                                        fontWeight: 500,
-                                        ml: 1,
-                                        color: "rgba(255,255,255,0.95)",
-                                    }}
-                                >
-                                    {label}
-                                </Typography>
-                            )}
-                        </Box>
-                    ))}
+                        ) : (
+                            <Button
+                                onClick={handleSignupClick}
+                                sx={{
+                                    color: ACCENT_DARK,
+                                    fontWeight: 500,
+                                    bgcolor: "rgba(255,255,255,0.9)",
+                                    px: 2,
+                                    borderRadius: 2,
+                                }}
+                            >
+                                Sign up
+                            </Button>
+                        )}
+                    </Box>
+                </>
+            )}
+
+            <Drawer
+                anchor="left"
+                open={mobileDrawerOpen}
+                onClose={() => setMobileDrawerOpen(false)}
+                PaperProps={{
+                    sx: {
+                        width: 260,
+                        bgcolor: SIDEBAR_BG,
+                        color: "#fff",
+                        pt: 3,
+                    },
+                }}
+            >
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+                    <img src="/logo.svg" alt="logo" style={{ width: 48 }} />
                 </Box>
 
-                <Box sx={{ flex: 1 }} />
+                {menuItems.map(({ icon, label }, index) => (
+                    <Box
+                        key={label}
+                        onClick={() => {
+                            if (index === 0) goToHome();
+                            setMobileDrawerOpen(false);
+                        }}
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                            px: 3,
+                            py: 1.5,
+                            cursor: "pointer",
+                            "&:hover": { background: "rgba(255,255,255,0.1)" },
+                        }}
+                    >
+                        <img
+                            src={icon}
+                            alt={label}
+                            style={{
+                                width: 22,
+                                height: 22,
+                                filter: "brightness(0) invert(1)",
+                            }}
+                        />
+                        <Typography sx={{ fontSize: 14 }}>{label}</Typography>
+                    </Box>
+                ))}
+            </Drawer>
+
+            {!isMobile && (
                 <Box
                     sx={{
-                        width: "100%",
+                        width: sidebarWidth,
+                        bgcolor: SIDEBAR_BG,
+                        color: "#664B2E",
                         display: "flex",
-                        justifyContent: "center",
-                        mb: 1,
+                        flexDirection: "column",
+                        alignItems: "center",
+                        py: 3,
+                        px: collapsed ? 1 : 2,
+                        gap: 2,
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        height: "100vh",
+                        zIndex: 1300,
+                        overflowY: "auto",
                     }}
                 >
+                    <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                        <img
+                            src="/logo.svg"
+                            alt="logo"
+                            style={{ width: collapsed ? 46 : 46, height: "auto" }}
+                        />
+                    </Box>
+
                     <Box
+                        onClick={() => setCollapsed((s) => !s)}
                         sx={{
                             width: 48,
                             height: 48,
                             borderRadius: "50%",
-                            bgcolor: ACCENT_LIGHT,
+                            mt: 2,
+                            mb: 2,
+                            background: "#866A4D",
+                            border: "1px solid #CAA361",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            color: ACCENT_DARK,
-                            fontWeight: 400,
                             cursor: "pointer",
-                            boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+                            transition: "all 250ms ease",
+                            boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
+                            "&:hover": {
+                                transform: "scale(1.05)",
+                                background: "#8b7358",
+                            },
                         }}
                     >
-                        SOS
+                        <Box
+                            sx={{
+                                width: 32,
+                                height: 72,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                transition: "transform 250ms ease",
+                                transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
+                            }}
+                        >
+                            <svg
+                                width="24"
+                                height="24"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                            >
+                                <path
+                                    d="M9 6L15 12L9 18"
+                                    stroke="white"
+                                    strokeWidth="1.3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+                            </svg>
+                        </Box>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            mt: 1,
+                            width: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.5,
+                        }}
+                    >
+                        {menuItems.map(({ icon, label }, index) => (
+                            <Box
+                                key={label}
+                                onClick={index === 0 ? goToHome : undefined}
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: collapsed ? 0 : 1,
+                                    justifyContent: collapsed ? "center" : "flex-start",
+                                    cursor: index === 0 ? "pointer" : "default",
+                                }}
+                            >
+                                <IconButton
+                                    sx={{
+                                        color: "#EDDBBF",
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 2,
+                                        justifyContent: "center",
+                                        "&:hover": {
+                                            background: "rgba(255,255,255,0.1)",
+                                        },
+                                    }}
+                                >
+                                    <img
+                                        src={icon}
+                                        alt={label}
+                                        style={{
+                                            width: 22,
+                                            height: 22,
+                                            objectFit: "contain",
+                                            filter: "brightness(0) invert(1)",
+                                        }}
+                                    />
+                                </IconButton>
+                                {!collapsed && (
+                                    <Typography
+                                        sx={{
+                                            fontSize: 13,
+                                            fontWeight: 500,
+                                            ml: 1,
+                                            color: "rgba(255,255,255,0.95)",
+                                        }}
+                                    >
+                                        {label}
+                                    </Typography>
+                                )}
+                            </Box>
+                        ))}
+                    </Box>
+
+                    <Box sx={{ flex: 1 }} />
+
+                    <Box
+                        sx={{
+                            position: "fixed",
+                            top: 16,
+                            right: 24,
+                            zIndex: 2000,
+                        }}
+                    >
+                        {user ? (
+                            <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                                <Box
+                                    component="img"
+                                    src={user.avatar}
+                                    alt={user.name}
+                                    sx={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: "50%",
+                                        border: "2px solid #CAA361",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                            </IconButton>
+                        ) : (
+                            <Button
+                                onClick={handleSignupClick}
+                                sx={{
+                                    color: ACCENT_DARK,
+                                    fontWeight: 500,
+                                }}
+                            >
+                                Sign up
+                            </Button>
+                        )}
+
+                        <Menu
+                            anchorEl={signupAnchorEl}
+                            open={signupOpen}
+                            onClose={handleSignupClose}
+                            anchorOrigin={{
+                                vertical: "bottom",
+                                horizontal: "right",
+                            }}
+                            transformOrigin={{
+                                vertical: "top",
+                                horizontal: "right",
+                            }}
+                            PaperProps={{
+                                sx: {
+                                    borderRadius: 2,
+                                    mt: 1,
+                                    minWidth: 220,
+                                    boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+                                },
+                            }}
+                        >
+                            {user ? (
+                                <>
+                                    <MenuItem
+                                        disableRipple
+                                        sx={{
+                                            pointerEvents: "none",
+                                            "&:hover": { background: "transparent" },
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                width: "100%",
+                                                textAlign: "center",
+                                                py: 1,
+                                            }}
+                                        >
+                                            <Box
+                                                component="img"
+                                                src={user.avatar}
+                                                alt={user.name}
+                                                sx={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    borderRadius: "50%",
+                                                    mb: 1,
+                                                }}
+                                            />
+                                            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                                                {user.name}
+                                            </Typography>
+                                            <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
+                                                {user.email}
+                                            </Typography>
+                                        </Box>
+                                    </MenuItem>
+
+                                    <Box sx={{ px: 2, my: 1 }}>
+                                        <Box sx={{ height: 1, bgcolor: "#E5E7EB" }} />
+                                    </Box>
+
+                                    <MenuItem
+                                        onClick={handleLogout}
+                                        sx={{
+                                            justifyContent: "center",
+                                            color: "#B91C1C",
+                                            fontWeight: 500,
+                                        }}
+                                    >
+                                        Logout
+                                    </MenuItem>
+                                </>
+                            ) : (
+                                <MenuItem
+                                    disableRipple
+                                    sx={{
+                                        pt: 3,
+                                        pb: 2,
+                                        "&:hover": { background: "transparent" },
+                                    }}
+                                >
+                                    <Box sx={{ width: "100%" }}>
+                                        <Typography
+                                            sx={{
+                                                mb: 2,
+                                                textAlign: "center",
+                                                fontSize: 14,
+                                                fontWeight: 600,
+                                                color: "#374151",
+                                            }}
+                                        >
+                                            Sign up
+                                        </Typography>
+
+                                        <Box
+                                            onClick={() => {
+                                                handleSignupClose();
+                                                window.location.href = `${API_BASE}/auth/google`;
+                                            }}
+                                            sx={{
+                                                width: "100%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                gap: 1.5,
+                                                py: 1.4,
+                                                px: 3,
+                                                borderRadius: "14px",
+                                                backgroundColor: "#F9FAFB",
+                                                color: "#111827",
+                                                border: "1px solid #E5E7EB",
+                                                cursor: "pointer",
+                                                "&:hover": {
+                                                    backgroundColor: "#F3F4F6",
+                                                },
+                                            }}
+                                        >
+                                            <Box
+                                                component="img"
+                                                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                                alt="Google"
+                                                sx={{ width: 20, height: 20 }}
+                                            />
+                                            <Typography sx={{ fontWeight: 500 }}>
+                                                Continue with Google
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </MenuItem>
+                            )}
+                        </Menu>
+                    </Box>
+
+                    <Box
+                        sx={{
+                            width: "100%",
+                            display: "flex",
+                            justifyContent: "center",
+                            mb: 1,
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: "50%",
+                                bgcolor: ACCENT_LIGHT,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: ACCENT_DARK,
+                                fontWeight: 400,
+                                cursor: "pointer",
+                                boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+                            }}
+                        >
+                            SOS
+                        </Box>
                     </Box>
                 </Box>
-            </Box>
+            )}
 
-            {/* MAIN CONTENT */}
             <Box
                 sx={{
                     flex: 1,
-                    marginLeft: `${sidebarWidth}px`,
+                    marginLeft: isMobile ? 0 : `${sidebarWidth}px`,
                     height: "100vh",
                     overflowY: "auto",
                     overflowX: "hidden",
@@ -499,32 +865,34 @@ export default function ChatScreenMui() {
                         minHeight: "100%",
                         display: "flex",
                         flexDirection: "column",
+                        px: isMobile ? 2 : 3,
                     }}
                 >
-                    {/* HERO */}
                     <Box
                         sx={{
                             display: conversationMode ? "none" : "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            pt: { xs: 6, md: 10 },
-                            transition:
-                                "opacity 320ms ease, transform 320ms ease",
+                            pt: { xs: 10, md: 10 },
+                            transition: "opacity 320ms ease, transform 320ms ease",
                             opacity: conversationMode ? 0 : 1,
                             transform: conversationMode
                                 ? "translateY(-10px) scale(0.99)"
                                 : "none",
                         }}
                     >
-                        <InteractiveSvgAvatar
-                            maxOffsetPx={3}
-                            style={{
-                                width: 160,
-                                height: 160,
-                                marginTop: 24,
-                                marginBottom: 12,
-                            }}
-                        />
+                        {!isMobile && (
+                            <InteractiveSvgAvatar
+                                maxOffsetPx={3}
+                                style={{
+                                    width: 160,
+                                    height: 160,
+                                    marginTop: 24,
+                                    marginBottom: 12,
+                                }}
+                            />
+                        )}
+
                         <Typography
                             variant="h4"
                             align="center"
@@ -533,16 +901,18 @@ export default function ChatScreenMui() {
                                 mb: 1,
                                 lineHeight: 1.55,
                                 color: ACCENT_DARK,
+                                fontSize: { xs: "1.5rem", md: "2.125rem" },
+                                px: 2,
                             }}
                         >
                             I'm Flora,{" "}
-                            <Box
-                                component="span"
-                                sx={{ fontWeight: 400 }}
-                            >
+                            <Box component="span" sx={{ fontWeight: 400 }}>
                                 your AI Mental Health Companion
                             </Box>
                         </Typography>
+<button onClick={() => window.location.href = "/admin"}>
+  Go Admin
+</button>
 
                         <Typography
                             variant="h6"
@@ -552,13 +922,13 @@ export default function ChatScreenMui() {
                                 mb: 6,
                                 fontWeight: 400,
                                 color: ACCENT_DARK,
+                                fontSize: { xs: "1rem", md: "1.25rem" },
+                                px: 2,
                             }}
                         >
-                            I'm here to support your emotional health in any way
-                            I can!
+                            I'm here to support your emotional health in any way I can!
                         </Typography>
 
-                        {/* Input (hero) */}
                         <Box
                             component="form"
                             onSubmit={onSubmit}
@@ -571,7 +941,7 @@ export default function ChatScreenMui() {
                         >
                             <Box
                                 sx={{
-                                    width: { xs: "94%", md: "74%" },
+                                    width: { xs: "100%", md: "74%" },
                                     maxWidth: 1100,
                                     display: "flex",
                                     alignItems: "center",
@@ -581,9 +951,7 @@ export default function ChatScreenMui() {
                                 <Box sx={{ position: "relative", flex: 1 }}>
                                     <TextField
                                         value={input}
-                                        onChange={(e) =>
-                                            setInput(e.target.value)
-                                        }
+                                        onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={onKeyDown}
                                         placeholder="Start typing here..."
                                         multiline={false}
@@ -600,8 +968,7 @@ export default function ChatScreenMui() {
                                                 bgcolor: INPUT_BG,
                                                 display: "flex",
                                                 alignItems: "center",
-                                                boxShadow:
-                                                    "inset 0 1px 0 rgba(0,0,0,0.02)",
+                                                boxShadow: "inset 0 1px 0 rgba(0,0,0,0.02)",
                                                 "& .MuiInputBase-input": {
                                                     height: "100%",
                                                     display: "flex",
@@ -611,10 +978,10 @@ export default function ChatScreenMui() {
                                                     color: ACCENT_DARK,
                                                 },
                                                 "& .MuiInputBase-input::placeholder":
-                                                    {
-                                                        color: "#8F7E63",
-                                                        opacity: 1,
-                                                    },
+                                                {
+                                                    color: "#8F7E63",
+                                                    opacity: 1,
+                                                },
                                             },
                                         }}
                                         disabled={sending}
@@ -1009,11 +1376,11 @@ export default function ChatScreenMui() {
                                                         bgcolor: INPUT_BG,
                                                         paddingY: "14px",
                                                         "& .MuiInputBase-input":
-                                                            {
-                                                                fontSize: 16,
-                                                                lineHeight: 1.6,
-                                                                color: ACCENT_DARK,
-                                                            },
+                                                        {
+                                                            fontSize: 16,
+                                                            lineHeight: 1.6,
+                                                            color: ACCENT_DARK,
+                                                        },
                                                     },
                                                 }}
                                                 disabled={sending}

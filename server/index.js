@@ -5,6 +5,16 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import OpenAI from 'openai';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import connectDB from './db.js';
+import User from './models/User.js';
+import ChatSummary from './models/ChatSummary.js';
+
+
+
+
 
 const app = express();
 
@@ -21,22 +31,23 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
-    
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('CORS not allowed'), false);
-    }
-  },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: ['http://localhost:3001', 'http://localhost:5173'],
   credentials: true
 }));
 
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'flora-secret',
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -49,6 +60,118 @@ const openai = new OpenAI({
 });
 
 let KB_TEXTS = [];
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const existingUser = await User.findOne({
+          googleId: profile.id,
+        });
+
+        if (existingUser) {
+          existingUser.lastLogin = new Date();
+          await existingUser.save();
+          return done(null, existingUser);
+        }
+
+        const newUser = await User.create({
+          googleId: profile.id,
+          name: profile.displayName,
+          email: profile.emails?.[0]?.value,
+          avatar: profile.photos?.[0]?.value,
+        });
+
+        return done(null, newUser);
+      } catch (err) {
+        return done(err, null);
+      }
+    }
+  )
+);
+
+
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+
+app.get(
+  '/auth/google',
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+  })
+);
+app.get(
+  '/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    const user = req.user; // comes from MongoDB
+
+    const frontendUrl =  'https://luna.flowergrid.co.uk';
+
+    const userPayload = {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+    };
+
+    res.redirect(
+      `${frontendUrl}?user=${encodeURIComponent(
+        JSON.stringify(userPayload)
+      )}`
+    );
+  }
+);
+
+
+function isUserLoggedIn(req) {
+  return !!req.user;
+}
+function isAdmin(req) {
+  return req.user?.email === "admin@flowergrid.co.uk";
+}
+
+function countBotMessages(sessionId) {
+  const messages = getSessionMessages(sessionId);
+  return messages.filter(m => m.role === 'assistant').length;
+}
+async function generateChatSummary(messages) {
+  if (!messages.length) return '';
+
+  const conversation = messages
+    .map(m => `${m.role === 'user' ? 'User' : 'Flora'}: ${m.content}`)
+    .join('\n');
+
+  const resp = await openai.chat.completions.create({
+    model: process.env.CHAT_MODEL || 'gpt-4.1',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Summarise this conversation in 3 to 5 sentences, focusing on the main concerns and emotional themes.',
+      },
+      {
+        role: 'user',
+        content: conversation.slice(0, 8000),
+      },
+    ],
+    temperature: 0.3,
+    max_completion_tokens: 180,
+  });
+
+  return resp?.choices?.[0]?.message?.content?.trim() || '';
+}
 
 
 async function embedText(text) {
@@ -171,7 +294,7 @@ function getSessionMessages(sessionId) {
 
 
 const FLORA_PROMPT = `
-You are Flora, the friendly and supportive chatbot for FlowerGrid, a holistic wellness centre in the UK.
+You are Luna, the friendly and supportive chatbot for FlowerGrid, a holistic wellness centre in the UK.
 • Never write long paragraphs. Maximum 2–3 sentences per reply, always concise.
 
 IDENTITY AND ROLE
@@ -238,6 +361,19 @@ STYLE
 - Where it fits, end with a gentle question or invitation to share more.
 `;
 
+const LOGIN_REQUIRED_MESSAGE = `
+If you would like to continue this conversation, please log in with your email.
+
+Thank you for sharing that with me. What you are going through sounds really difficult, and I want you to know that support is available right now.
+
+Please reach out to one of these services:
+
+• Samaritans: 116 123 (free, 24 hours)
+• Crisis Text Line: Text SHOUT to 85258
+• Mind Infoline: 0300 123 3393
+
+You do not have to face this alone. Speaking to a trained person can make a real difference.
+`;
 
 async function chatWithFlora(history, userMessage, options = {}) {
   const { distressFlag = false } = options;
@@ -252,7 +388,7 @@ async function chatWithFlora(history, userMessage, options = {}) {
     const top = kbMatches[0];
     kbContext =
       `\n\nAdditional FlowerGrid reference information (from ${top.file}):\n` +
-      top.text.slice(0, 2000); 
+      top.text.slice(0, 2000);
   }
 
   const systemContent = FLORA_PROMPT + extraDistressInstruction + kbContext;
@@ -318,6 +454,15 @@ app.post('/chat', async (req, res) => {
       content: m.content
     }));
 
+    const botReplyCount = countBotMessages(sessionId);
+    const loggedIn = isUserLoggedIn(req);
+
+    // 🔒 Limit free messages
+    if (!loggedIn && botReplyCount >= 8) {
+      addToSession(sessionId, 'assistant', LOGIN_REQUIRED_MESSAGE);
+      return res.json({ answer: LOGIN_REQUIRED_MESSAGE });
+    }
+
     const distressFlag = detectDistress(text);
 
     const reply = await chatWithFlora(history, text, { distressFlag });
@@ -331,9 +476,73 @@ app.post('/chat', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+app.get("/admin/users", async (req, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
 
+    const users = await User.find().select("name email avatar createdAt");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
+
+app.get("/admin/summaries", async (req, res) => {
+  try {
+    const summaries = await ChatSummary.find()
+      .sort({ createdAt: -1 });
+
+    res.json(summaries);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch summaries" });
+  }
+});
+
+
+
+app.post("/chat/summary", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const { sessionId } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: "Session ID required" });
+    }
+
+    const messages = getSessionMessages(sessionId);
+    if (!messages.length) {
+      return res.json({ success: true });
+    }
+
+    const summary = await generateChatSummary(messages);
+
+    if (summary) {
+      await ChatSummary.create({
+        userId: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        avatar:req.user.avatar,
+        summary,
+      });
+    }
+  
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Summary save error:", err);
+    res.status(500).json({ error: "Failed to save summary" });
+  }
+});
+
+await connectDB();
 
 app.listen(PORT, async () => {
   await buildIndex();
   console.log(`🌼 Flora is live at http://localhost:${PORT}`);
 });
+    
