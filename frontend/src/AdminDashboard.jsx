@@ -10,7 +10,7 @@ import {
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 
-const API_BASE = 'https://api.luna.flowergrid.co.uk';
+const API_BASE = 'http://localhost:3001';
 
 export default function AdminSummary() {
   const [summaries, setSummaries] = useState([]);

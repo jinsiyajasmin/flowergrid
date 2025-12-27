@@ -31,8 +31,8 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk'],
+  origin: ['http://localhost:3001', 'http://localhost:5173', 
+],
   credentials: true
 }));
 
@@ -118,7 +118,7 @@ app.get(
   (req, res) => {
     const user = req.user; // comes from MongoDB
 
-    const frontendUrl =  'https://luna.flowergrid.co.uk';
+    const frontendUrl =  'http://localhost:5173';
 
     const userPayload = {
       id: user._id,
