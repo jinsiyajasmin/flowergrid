@@ -31,7 +31,8 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:5173', 
+  origin: ['http://localhost:3001', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
+  'https://api.luna.flowergrid.co.uk'
 ],
   credentials: true
 }));
@@ -118,7 +119,7 @@ app.get(
   (req, res) => {
     const user = req.user; // comes from MongoDB
 
-    const frontendUrl =  'http://localhost:5173';
+    const frontendUrl =  'https://luna.flowergrid.co.uk';
 
     const userPayload = {
       id: user._id,
@@ -350,7 +351,7 @@ FLOWERGRID CONTEXT
   4) Holistic and Energy Healing: meditation, mindfulness, breathing, Reiki, colour therapy, auricular acupuncture and soul reflection work.
 - When relevant, you may gently suggest which of these areas might suit their needs and mention that they can contact FlowerGrid for deeper support, but never push and never overdo it.
 
-BOUNDARIES
+BOUNDARIES.  
 - Do not diagnose or prescribe and do not give specific medical advice.
 - If they ask for a diagnosis or medical opinion, kindly say you cannot provide medical advice and recommend they speak to a qualified healthcare professional. You may mention that FlowerGrid has doctors and medical practitioners who can support them.
 - If they ask for pricing details, explain that you do not have pricing to hand and that the FlowerGrid team can help at sk@flowergrid.co.uk or +44 7432 211096.
