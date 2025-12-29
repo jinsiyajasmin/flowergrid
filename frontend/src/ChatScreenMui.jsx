@@ -136,7 +136,7 @@ export default function ChatScreenMui() {
         { icon: "/worksheets.svg", label: "Worksheets" },
     ];
 
-    const API_BASE = 'http://localhost:3001';
+    const API_BASE = 'https://api.luna.flowergrid.co.uk';
 
     useEffect(() => {
         try {
@@ -185,7 +185,7 @@ export default function ChatScreenMui() {
             if (!sessionId) return;
 
             navigator.sendBeacon(
-                "http://localhost:3001/chat/summary",
+                "https://api.luna.flowergrid.co.uk/chat/summary",
                 JSON.stringify({ sessionId })
             );
         }
@@ -420,7 +420,7 @@ function VoiceWaveformOverlay() {
             const sessionId = sessionStorage.getItem("flora_session_id");
             if (!sessionId) return;
 
-            await fetch("http://localhost:3001/chat/summary", {
+            await fetch("https://api.luna.flowergrid.co.uk/chat/summary", {
                 method: "POST",
                 credentials: "include",
                 headers: {

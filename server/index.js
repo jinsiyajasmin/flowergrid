@@ -119,7 +119,7 @@ app.get(
   (req, res) => {
     const user = req.user; // comes from MongoDB
 
-    const frontendUrl = 'http://localhost:5173';
+    const frontendUrl = 'https://luna.flowergrid.co.uk';
 
     const userPayload = {
       id: user._id,
