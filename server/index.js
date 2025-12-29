@@ -32,8 +32,8 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: ['http://localhost:3001', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk'
-],
+    'https://api.luna.flowergrid.co.uk'
+  ],
   credentials: true
 }));
 
@@ -119,7 +119,7 @@ app.get(
   (req, res) => {
     const user = req.user; // comes from MongoDB
 
-    const frontendUrl =  'https://luna.flowergrid.co.uk';
+    const frontendUrl = 'http://localhost:5173';
 
     const userPayload = {
       id: user._id,
@@ -294,6 +294,20 @@ function getSessionMessages(sessionId) {
   return SESSION_CONTEXT.get(sessionId) || [];
 }
 
+async function textToSpeech(text) {
+  const response = await openai.audio.speech.create({
+    model: "gpt-4o-mini-tts", // high-quality, calm voice
+    voice: "alloy",           // neutral, soothing
+    input: text,
+    format: "mp3"
+  });
+
+  // Convert stream → buffer
+  const buffer = Buffer.from(await response.arrayBuffer());
+
+  // Send as base64 to frontend
+  return buffer.toString("base64");
+}
 
 const FLORA_PROMPT = `
 You are Luna, the friendly and supportive chatbot for FlowerGrid, a holistic wellness centre in the UK.
@@ -466,13 +480,24 @@ app.post('/chat', async (req, res) => {
     }
 
     const distressFlag = detectDistress(text);
-
     const reply = await chatWithFlora(history, text, { distressFlag });
 
     addToSession(sessionId, 'user', text);
     addToSession(sessionId, 'assistant', reply);
 
-    res.json({ answer: reply });
+    // 🎙 Convert bot reply to voice
+    let audio = null;
+    try {
+      audio = await textToSpeech(reply);
+    } catch (ttsErr) {
+      console.error("TTS failed:", ttsErr);
+    }
+
+    res.json({
+      answer: reply,   // text reply
+      audio            // base64 mp3 (or null if failed)
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
@@ -529,11 +554,11 @@ app.post("/chat/summary", async (req, res) => {
         userId: req.user._id,
         name: req.user.name,
         email: req.user.email,
-        avatar:req.user.avatar,
+        avatar: req.user.avatar,
         summary,
       });
     }
-  
+
     res.json({ success: true });
   } catch (err) {
     console.error("Summary save error:", err);
@@ -547,4 +572,3 @@ app.listen(PORT, async () => {
   await buildIndex();
   console.log(`🌼 Flora is live at http://localhost:${PORT}`);
 });
-    

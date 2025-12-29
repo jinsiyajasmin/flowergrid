@@ -17,6 +17,8 @@ import Button from "@mui/material/Button";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Drawer from "@mui/material/Drawer";
 import MenuIcon from "@mui/icons-material/Menu";
+import AddIcon from "@mui/icons-material/Add";
+
 
 function TypingIndicator({ bg, color }) {
     return (
@@ -105,6 +107,8 @@ export default function ChatScreenMui() {
     const signupOpen = Boolean(signupAnchorEl);
     const [user, setUser] = useState(null);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+    const audioRef = useRef(null);
+
 
     const handleSignupClick = (event) => {
         setSignupAnchorEl(event.currentTarget);
@@ -125,14 +129,14 @@ export default function ChatScreenMui() {
         { icon: "/chat.svg", label: "Chat with Flora" },
         { icon: "/test.svg", label: "Self Tests" },
         { icon: "/book.svg", label: "Book a Therapist" },
-        { icon: "/focus.svg", label: "Focus Zone" },
-        { icon: "/care.svg", label: "Self Care" },
-        { icon: "/music.svg", label: "Music" },
-        { icon: "/community.svg", label: "Community" },
+        // { icon: "/focus.svg", label: "Focus Zone" },
+        // { icon: "/care.svg", label: "Self Care" },
+        // { icon: "/music.svg", label: "Music" },
+        // { icon: "/community.svg", label: "Community" },
         { icon: "/worksheets.svg", label: "Worksheets" },
     ];
 
-    const API_BASE = 'https://api.luna.flowergrid.co.uk';
+    const API_BASE = 'http://localhost:3001';
 
     useEffect(() => {
         try {
@@ -181,7 +185,7 @@ export default function ChatScreenMui() {
             if (!sessionId) return;
 
             navigator.sendBeacon(
-                "https://api.luna.flowergrid.co.uk/chat/summary",
+                "http://localhost:3001/chat/summary",
                 JSON.stringify({ sessionId })
             );
         }
@@ -258,6 +262,9 @@ export default function ChatScreenMui() {
         };
     }, []);
 
+   
+
+
     async function sendToServer(text) {
         if (!text) return;
         setConversationMode(true);
@@ -293,12 +300,18 @@ export default function ChatScreenMui() {
             }
 
             const reply =
-                data?.answer || data?.message || "Sorry, something went wrong.";
+  data?.answer || data?.message || "Sorry, something went wrong.";
 
-            setMessages((m) => [
-                ...m,
-                { id: Date.now() + 1, from: "bot", text: reply },
-            ]);
+setMessages((m) => [
+  ...m,
+  { id: Date.now() + 1, from: "bot", text: reply },
+]);
+
+// 🔊 PLAY BOT VOICE (if available)
+if (data?.audio) {
+  playBotVoice(data.audio);
+}
+
         } catch (err) {
             console.error("chat error", err);
             setMessages((m) => [
@@ -315,37 +328,91 @@ export default function ChatScreenMui() {
     }
 
 
-    function VoiceRecordingLine() {
+ 
+function VoiceWaveformOverlay() {
   return (
     <Box
       sx={{
         position: "absolute",
-        left: 16,
-        right: 64,
-        bottom: 6,
-        height: 3,
-        borderRadius: 2,
-        overflow: "hidden",
-        background: "rgba(80,57,32,0.15)",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        pointerEvents: "none",
+        px: 2.5,
       }}
     >
+      {/* dotted baseline */}
       <Box
         sx={{
-          width: "40%",
-          height: "100%",
-          background: "#503920",
-          animation: "voiceWave 1.2s infinite ease-in-out",
+          position: "absolute",
+          left: 20,
+          right: 20,
+          height: 2,
+          background:
+            "repeating-linear-gradient(to right, rgba(255,255,255,0.6) 0 4px, transparent 4px 8px)",
+          opacity: 0.6,
         }}
       />
+
+      {/* waveform */}
+      <Box
+        sx={{
+          display: "flex",
+          gap: "3px",
+          alignItems: "center",
+          marginLeft: 60,
+        }}
+      >
+        {[...Array(22)].map((_, i) => (
+          <Box
+            key={i}
+            sx={{
+              width: 3,
+              height: `${Math.random() * 22 + 6}px`,
+              borderRadius: 2,
+              backgroundColor: "#fff",
+              opacity: 0.9,
+              animation: "wavePulse 1.2s infinite ease-in-out",
+              animationDelay: `${i * 0.05}s`,
+            }}
+          />
+        ))}
+      </Box>
+
       <style>{`
-        @keyframes voiceWave {
-          0% { transform: translateX(-100%); }
-          50% { transform: translateX(150%); }
-          100% { transform: translateX(300%); }
+        @keyframes wavePulse {
+          0%, 100% {
+            transform: scaleY(0.4);
+            opacity: 0.4;
+          }
+          50% {
+            transform: scaleY(1.2);
+            opacity: 1;
+          }
         }
       `}</style>
     </Box>
   );
+}
+
+
+ function playBotVoice(base64Audio) {
+  try {
+    // Stop previous audio if any
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+    audioRef.current = audio;
+
+    audio.play().catch(err => {
+      console.warn("Autoplay blocked:", err);
+    });
+  } catch (err) {
+    console.error("Audio play failed:", err);
+  }
 }
 
     async function sendChatSummary() {
@@ -353,7 +420,7 @@ export default function ChatScreenMui() {
             const sessionId = sessionStorage.getItem("flora_session_id");
             if (!sessionId) return;
 
-            await fetch("'https://api.luna.flowergrid.co.uk'/chat/summary", {
+            await fetch("http://localhost:3001/chat/summary", {
                 method: "POST",
                 credentials: "include",
                 headers: {
@@ -372,14 +439,21 @@ export default function ChatScreenMui() {
         handleSignupClose();
     }
 
-    function onSubmit(e) {
-        e?.preventDefault();
-        const trimmed = input.trim();
-        if (!trimmed) return;
-        setConversationMode(true);
-        sendToServer(trimmed);
-        setInput("");
-    }
+  function onSubmit(e) {
+  e?.preventDefault();
+
+  if (audioRef.current) {
+    audioRef.current.pause();
+    audioRef.current = null;
+  }
+
+  const trimmed = input.trim();
+  if (!trimmed) return;
+
+  setConversationMode(true);
+  sendToServer(trimmed);
+  setInput("");
+}
 
     function onKeyDown(e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -448,6 +522,7 @@ export default function ChatScreenMui() {
                             top: 16,
                             left: 16,
                             zIndex: 2000,
+
                             bgcolor: "#fff",
                             boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
                         }}
@@ -461,6 +536,7 @@ export default function ChatScreenMui() {
                             top: 16,
                             right: 16,
                             zIndex: 2000,
+
                         }}
                     >
                         {user ? (
@@ -475,6 +551,7 @@ export default function ChatScreenMui() {
                                         borderRadius: "50%",
                                         border: "2px solid #CAA361",
                                         objectFit: "cover",
+
                                     }}
                                 />
                             </IconButton>
@@ -512,6 +589,35 @@ export default function ChatScreenMui() {
                 <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
                     <img src="/logo.svg" alt="logo" style={{ width: 48 }} />
                 </Box>
+                {user && (
+                    <Box
+                        onClick={() => {
+                            goToHome();
+                            setMobileDrawerOpen(false);
+                        }}
+                        sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                            px: 3,
+                            py: 1.5,
+                            cursor: "pointer",
+                            borderRadius: 2,
+                            mx: 2,
+                            mb: 1,
+                            background: "rgba(255,255,255,0.08)",
+                            "&:hover": {
+                                background: "rgba(255,255,255,0.14)",
+                            },
+                        }}
+                    >
+                        <AddIcon sx={{ fontSize: 22, color: "#EDDBBF" }} />
+                        <Typography sx={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
+                            New Chat
+                        </Typography>
+                    </Box>
+                )}
+
 
                 {menuItems.map(({ icon, label }, index) => (
                     <Box
@@ -632,6 +738,51 @@ export default function ChatScreenMui() {
                             gap: 1.5,
                         }}
                     >
+                        {user && (
+                            <Box
+                                onClick={goToHome}
+                                sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                    px: collapsed ? 0 : 1,
+                                    justifyContent: collapsed ? "center" : "flex-start",
+                                    cursor: "pointer",
+                                    mb: 1,
+                                }}
+                            >
+                                <IconButton
+                                    sx={{
+                                        color: "#EDDBBF",
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 2,
+                                        justifyContent: "center",
+                                        border: "1px solid rgba(255,255,255,0.18)",
+                                        background: "rgba(255,255,255,0.06)",
+                                        "&:hover": {
+                                            background: "rgba(255,255,255,0.14)",
+                                        },
+                                    }}
+                                >
+                                    <AddIcon sx={{ fontSize: 22 }} />
+                                </IconButton>
+
+                                {!collapsed && (
+                                    <Typography
+                                        sx={{
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            ml: 1,
+                                            color: "rgba(255,255,255,0.95)",
+                                        }}
+                                    >
+                                        New Chat
+                                    </Typography>
+                                )}
+                            </Box>
+                        )}
+
                         {menuItems.map(({ icon, label }, index) => (
                             <Box
                                 key={label}
@@ -721,137 +872,7 @@ export default function ChatScreenMui() {
                             </Button>
                         )}
 
-                        <Menu
-                            anchorEl={signupAnchorEl}
-                            open={signupOpen}
-                            onClose={handleSignupClose}
-                            anchorOrigin={{
-                                vertical: "bottom",
-                                horizontal: "right",
-                            }}
-                            transformOrigin={{
-                                vertical: "top",
-                                horizontal: "right",
-                            }}
-                            PaperProps={{
-                                sx: {
-                                    borderRadius: 2,
-                                    mt: 1,
-                                    minWidth: 220,
-                                    boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
-                                },
-                            }}
-                        >
-                            {user ? (
-                                <>
-                                    <MenuItem
-                                        disableRipple
-                                        sx={{
-                                            pointerEvents: "none",
-                                            "&:hover": { background: "transparent" },
-                                        }}
-                                    >
-                                        <Box
-                                            sx={{
-                                                width: "100%",
-                                                textAlign: "center",
-                                                py: 1,
-                                            }}
-                                        >
-                                            <Box
-                                                component="img"
-                                                src={user.avatar}
-                                                alt={user.name}
-                                                sx={{
-                                                    width: 48,
-                                                    height: 48,
-                                                    borderRadius: "50%",
-                                                    mb: 1,
-                                                }}
-                                            />
-                                            <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-                                                {user.name}
-                                            </Typography>
-                                            <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
-                                                {user.email}
-                                            </Typography>
-                                        </Box>
-                                    </MenuItem>
 
-                                    <Box sx={{ px: 2, my: 1 }}>
-                                        <Box sx={{ height: 1, bgcolor: "#E5E7EB" }} />
-                                    </Box>
-
-                                    <MenuItem
-                                        onClick={handleLogout}
-                                        sx={{
-                                            justifyContent: "center",
-                                            color: "#B91C1C",
-                                            fontWeight: 500,
-                                        }}
-                                    >
-                                        Logout
-                                    </MenuItem>
-                                </>
-                            ) : (
-                                <MenuItem
-                                    disableRipple
-                                    sx={{
-                                        pt: 3,
-                                        pb: 2,
-                                        "&:hover": { background: "transparent" },
-                                    }}
-                                >
-                                    <Box sx={{ width: "100%" }}>
-                                        <Typography
-                                            sx={{
-                                                mb: 2,
-                                                textAlign: "center",
-                                                fontSize: 14,
-                                                fontWeight: 600,
-                                                color: "#374151",
-                                            }}
-                                        >
-                                            Sign up
-                                        </Typography>
-
-                                        <Box
-                                            onClick={() => {
-                                                handleSignupClose();
-                                                window.location.href = `${API_BASE}/auth/google`;
-                                            }}
-                                            sx={{
-                                                width: "100%",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                gap: 1.5,
-                                                py: 1.4,
-                                                px: 3,
-                                                borderRadius: "14px",
-                                                backgroundColor: "#F9FAFB",
-                                                color: "#111827",
-                                                border: "1px solid #E5E7EB",
-                                                cursor: "pointer",
-                                                "&:hover": {
-                                                    backgroundColor: "#F3F4F6",
-                                                },
-                                            }}
-                                        >
-                                            <Box
-                                                component="img"
-                                                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                                                alt="Google"
-                                                sx={{ width: 20, height: 20 }}
-                                            />
-                                            <Typography sx={{ fontWeight: 500 }}>
-                                                Continue with Google
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </MenuItem>
-                            )}
-                        </Menu>
                     </Box>
 
                     <Box
@@ -883,6 +904,137 @@ export default function ChatScreenMui() {
                 </Box>
             )}
 
+            <Menu
+                anchorEl={signupAnchorEl}
+                open={signupOpen}
+                onClose={handleSignupClose}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "right",
+                }}
+                transformOrigin={{
+                    vertical: "top",
+                    horizontal: "right",
+                }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 2,
+                        mt: 1,
+                        minWidth: 220,
+                        boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+                    },
+                }}
+            >
+                {user ? (
+                    <>
+                        <MenuItem
+                            disableRipple
+                            sx={{
+                                pointerEvents: "none",
+                                "&:hover": { background: "transparent" },
+                            }}
+                        >
+                            <Box
+                                sx={{
+                                    width: "100%",
+                                    textAlign: "center",
+                                    py: 1,
+                                }}
+                            >
+                                <Box
+                                    component="img"
+                                    src={user.avatar}
+                                    alt={user.name}
+                                    sx={{
+                                        width: 48,
+                                        height: 48,
+                                        borderRadius: "50%",
+                                        mb: 1,
+                                    }}
+                                />
+                                <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                                    {user.name}
+                                </Typography>
+                                <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
+                                    {user.email}
+                                </Typography>
+                            </Box>
+                        </MenuItem>
+
+                        <Box sx={{ px: 2, my: 1 }}>
+                            <Box sx={{ height: 1, bgcolor: "#E5E7EB" }} />
+                        </Box>
+
+                        <MenuItem
+                            onClick={handleLogout}
+                            sx={{
+                                justifyContent: "center",
+                                color: "#B91C1C",
+                                fontWeight: 500,
+                            }}
+                        >
+                            Logout
+                        </MenuItem>
+                    </>
+                ) : (
+                    <MenuItem
+                        disableRipple
+                        sx={{
+                            pt: 3,
+                            pb: 2,
+                            "&:hover": { background: "transparent" },
+                        }}
+                    >
+                        <Box sx={{ width: "100%" }}>
+                            <Typography
+                                sx={{
+                                    mb: 2,
+                                    textAlign: "center",
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    color: "#374151",
+                                }}
+                            >
+                                Sign up
+                            </Typography>
+
+                            <Box
+                                onClick={() => {
+                                    handleSignupClose();
+                                    window.location.href = `${API_BASE}/auth/google`;
+                                }}
+                                sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 1.5,
+                                    py: 1.4,
+                                    px: 3,
+                                    borderRadius: "14px",
+                                    backgroundColor: "#F9FAFB",
+                                    color: "#111827",
+                                    border: "1px solid #E5E7EB",
+                                    cursor: "pointer",
+                                    "&:hover": {
+                                        backgroundColor: "#F3F4F6",
+                                    },
+                                }}
+                            >
+                                <Box
+                                    component="img"
+                                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                    alt="Google"
+                                    sx={{ width: 20, height: 20 }}
+                                />
+                                <Typography sx={{ fontWeight: 500 }}>
+                                    Continue with Google
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </MenuItem>
+                )}
+            </Menu>
             <Box
                 sx={{
                     flex: 1,
@@ -900,6 +1052,7 @@ export default function ChatScreenMui() {
                         display: "flex",
                         flexDirection: "column",
                         px: isMobile ? 2 : 3,
+
                     }}
                 >
                     <Box
@@ -908,6 +1061,7 @@ export default function ChatScreenMui() {
                             flexDirection: "column",
                             alignItems: "center",
                             pt: { xs: 10, md: 10 },
+
                             transition: "opacity 320ms ease, transform 320ms ease",
                             opacity: conversationMode ? 0 : 1,
                             transform: conversationMode
@@ -927,38 +1081,73 @@ export default function ChatScreenMui() {
                             />
                         )}
 
-                        <Typography
-                            variant="h4"
-                            align="center"
-                            sx={{
-                                fontWeight: 600,
-                                mb: 1,
-                                lineHeight: 1.55,
-                                color: ACCENT_DARK,
-                                fontSize: { xs: "1.5rem", md: "2.125rem" },
-                                px: 2,
-                            }}
-                        >
-                            I'm Luna,{" "}
-                            <Box component="span" sx={{ fontWeight: 400 }}>
-                                your AI Mental Health Companion
-                            </Box>
-                        </Typography>
+                        {isMobile ? (
+                            <>
+                                <Box sx={{ height: 200 }} />
 
-                        <Typography
-                            variant="h6"
-                            align="center"
-                            sx={{
-                                maxWidth: 900,
-                                mb: 6,
-                                fontWeight: 400,
-                                color: ACCENT_DARK,
-                                fontSize: { xs: "1rem", md: "1.25rem" },
-                                px: 2,
-                            }}
-                        >
-                            I'm here to support your emotional health in any way I can!
-                        </Typography>
+                                <Typography
+                                    variant="h6"
+                                    align="center"
+                                    sx={{
+                                        fontWeight: 600,
+                                        mb: 0.5,
+                                        color: ACCENT_DARK,
+                                        fontSize: "1.5rem",
+                                        px: 2,
+                                    }}
+                                >
+                                    I'm Luna,
+                                </Typography>
+
+                                <Typography
+                                    align="center"
+                                    sx={{
+                                        fontWeight: 400,
+                                        mb: 2,
+                                        color: ACCENT_DARK,
+                                        fontSize: "1.05rem",
+                                    }}
+                                >
+                                    your AI Mental Health Companion
+                                </Typography>
+                                <Box sx={{ height: 340 }} />
+                            </>
+                        ) : (
+                            <Typography
+                                variant="h4"
+                                align="center"
+                                sx={{
+                                    fontWeight: 600,
+                                    mb: 1,
+                                    lineHeight: 1.55,
+                                    color: ACCENT_DARK,
+                                    fontSize: { xs: "1.5rem", md: "2.125rem" },
+                                    px: 2,
+                                }}
+                            >
+                                I'm Luna,{" "}
+                                <Box component="span" sx={{ fontWeight: 400 }}>
+                                    your AI Mental Health Companion
+                                </Box>
+                            </Typography>
+                        )}
+
+                        {!isMobile && (
+                            <Typography
+                                variant="h6"
+                                align="center"
+                                sx={{
+                                    maxWidth: 900,
+                                    mb: 6,
+                                    fontWeight: 400,
+                                    color: ACCENT_DARK,
+                                    fontSize: { xs: "1rem", md: "1.25rem" },
+                                    px: 2,
+                                }}
+                            >
+                                I'm here to support your emotional health in any way I can!
+                            </Typography>
+                        )}
 
                         <Box
                             component="form"
@@ -980,7 +1169,7 @@ export default function ChatScreenMui() {
                                 }}
                             >
                                 <Box sx={{ position: "relative", flex: 1 }}>
-                              <TextField
+                                    <TextField
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
                                         onKeyDown={onKeyDown}
@@ -1017,35 +1206,10 @@ export default function ChatScreenMui() {
                                         }}
                                         disabled={sending || isListening}
                                     />
-                                    
-                                    {isListening && (
-                                        <Box
-                                            sx={{
-                                                position: "absolute",
-                                                left: 24,
-                                                right: 120,
-                                                top: "50%",
-                                                transform: "translateY(-50%)",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 0.5,
-                                            }}
-                                        >
-                                            {[...Array(50)].map((_, i) => (
-                                                <Box
-                                                    key={i}
-                                                    sx={{
-                                                        width: 2,
-                                                        height: 2,
-                                                        borderRadius: "50%",
-                                                        bgcolor: "#503920",
-                                                        opacity: 0.4,
-                                                        animation: `dotFade 1.5s infinite ease-in-out ${i * 0.03}s`,
-                                                    }}
-                                                />
-                                            ))}
-                                        </Box>
-                                    )}
+
+  {isListening && <VoiceWaveformOverlay />}
+
+
 
                                     {/* MIC INSIDE FIELD (hero) */}
                                     <IconButton
@@ -1146,95 +1310,100 @@ export default function ChatScreenMui() {
                                 </Box>
                             </Box>
                         </Box>
-
-                        <Typography
-                            variant="body2"
-                            sx={{
-                                textAlign: "center",
-                                fontStyle: "italic",
-                                mb: 2,
-                                color: "#4E351A",
-                                fontFamily: "Poppins",
-                                fontSize: 14,
-                            }}
-                        >
-                            What people talk about most.
-                        </Typography>
-
-                        {/* Chips */}
-                        <Box
-                            sx={{
-                                display: "flex",
-                                gap: 2,
-                                justifyContent: "center",
-                                mt: 1,
-                            }}
-                        >
-                            {quickTopics.slice(0, 3).map((t) => (
-                                <Chip
-                                    key={t}
-                                    label={t}
-                                    onClick={() => setInput(t)}
-                                    variant="outlined"
+                        {!isMobile && (
+                            <>
+                                <Typography
+                                    variant="body2"
                                     sx={{
-                                        borderRadius: 99,
-                                        borderColor: "#9E7F49",
-                                        background: "transparent",
-                                        color: "rgba(80, 57, 32, 0.6)",
-                                        px: 3,
-                                        minWidth: 140,
-                                        "& .MuiChip-label": {
-                                            py: 0.7,
-                                            fontSize: 14,
-                                            fontFamily: "Poppins",
-                                        },
+                                        textAlign: "center",
+                                        fontStyle: "italic",
+                                        mb: 2,
+                                        color: "#4E351A",
+                                        fontFamily: "Poppins",
+                                        fontSize: 14,
                                     }}
-                                />
-                            ))}
-                        </Box>
-                        <Box
-                            sx={{
-                                display: "flex",
-                                gap: 2,
-                                justifyContent: "center",
-                                mt: 2,
-                            }}
-                        >
-                            {quickTopics.slice(3, 5).map((t) => (
-                                <Chip
-                                    key={t}
-                                    label={t}
-                                    onClick={() => setInput(t)}
-                                    variant="outlined"
-                                    sx={{
-                                        borderRadius: 99,
-                                        borderColor: "#9E7F49",
-                                        background: "transparent",
-                                        color: "rgba(80, 57, 32, 0.6)",
-                                        px: 3,
-                                        minWidth: 140,
-                                        "& .MuiChip-label": {
-                                            py: 0.7,
-                                            fontSize: 14,
-                                            fontFamily: "Poppins",
-                                        },
-                                    }}
-                                />
-                            ))}
-                        </Box>
+                                >
+                                    What people talk about most.
+                                </Typography>
 
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                mt: 6,
-                                color: "#826840",
-                                fontSize: 16,
-                                fontWeight: 300,
-                            }}
-                        >
-                            Disclaimer: Flora offers support, not medical care.
-                            Always consult a professional.
-                        </Typography>
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "center",
+                                        mt: 1,
+                                    }}
+                                >
+                                    {quickTopics.slice(0, 3).map((t) => (
+                                        <Chip
+                                            key={t}
+                                            label={t}
+                                            onClick={() => setInput(t)}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: 99,
+                                                borderColor: "#9E7F49",
+                                                background: "transparent",
+                                                color: "rgba(80, 57, 32, 0.6)",
+                                                px: 3,
+                                                minWidth: 140,
+                                                "& .MuiChip-label": {
+                                                    py: 0.7,
+                                                    fontSize: 14,
+                                                    fontFamily: "Poppins",
+                                                },
+                                            }}
+                                        />
+                                    ))}
+                                </Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "center",
+                                        mt: 2,
+                                    }}
+                                >
+                                    {quickTopics.slice(3, 5).map((t) => (
+                                        <Chip
+                                            key={t}
+                                            label={t}
+                                            onClick={() => setInput(t)}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: 99,
+                                                borderColor: "#9E7F49",
+                                                background: "transparent",
+                                                color: "rgba(80, 57, 32, 0.6)",
+                                                px: 3,
+                                                minWidth: 140,
+                                                "& .MuiChip-label": {
+                                                    py: 0.7,
+                                                    fontSize: 14,
+                                                    fontFamily: "Poppins",
+                                                },
+                                            }}
+                                        />
+                                    ))}
+                                </Box>
+
+
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        mt: 6,
+                                        color: "#826840",
+                                        fontSize: 16,
+                                        fontWeight: 300,
+                                    }}
+                                >
+                                    Disclaimer: Flora offers support, not medical care.
+                                    Always consult a professional.
+                                </Typography>
+                            </>
+                        )}
+
                     </Box>
 
                     {/* Conversation view */}
