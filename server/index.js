@@ -15,10 +15,9 @@ import ChatSummary from './models/ChatSummary.js';
 
 
 
-
 const app = express();
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 4000;
 const KB_DIR = path.resolve('./kb');
 const KB_EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
 const SESSION_MAX_MESSAGES = 8;
@@ -27,11 +26,11 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 
 const allowedOrigins = [
   'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk'
+  'https://api.luna.flowergrid.co.uk' 
 ];
 
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
+  origin: ['http://localhost:4000', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
     'https://api.luna.flowergrid.co.uk'
   ],
   credentials: true
@@ -47,7 +46,7 @@ app.use(
   })
 );
 
-app.use(passport.initialize());
+app.use(passport.initialize());   
 app.use(passport.session());
 
 
@@ -97,7 +96,7 @@ passport.use(
   )
 );
 
-
+ 
 passport.serializeUser((user, done) => {
   done(null, user);
 });
@@ -118,8 +117,8 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user; // comes from MongoDB
-
-    const frontendUrl = 'https://luna.flowergrid.co.uk';
+const frontendUrl = 'https://luna.flowergrid.co.uk';
+ // Change to your frontend URL
 
     const userPayload = {
       id: user._id,
@@ -570,5 +569,5 @@ await connectDB();
 
 app.listen(PORT, async () => {
   await buildIndex();
-  console.log(`🌼 Flora is live at http://localhost:${PORT}`);
+  console.log(`🌼 luna is live at http://localhost:${PORT}`);
 });

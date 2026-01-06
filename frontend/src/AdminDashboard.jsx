@@ -3,145 +3,477 @@ import {
   Box,
   Typography,
   Avatar,
+  Button,
+  Card,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   IconButton,
-  Collapse,
-  Divider,
+  useTheme,
+  useMediaQuery,
+  Chip,
+  Paper,
 } from "@mui/material";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import flowerGridLogo from "../assets/flower.png"; // update path
+import PeopleIcon from "../assets/none.png"; // update path
 
-const API_BASE = 'https://api.luna.flowergrid.co.uk';
 
-export default function AdminSummary() {
+
+
+// ✅ API base (Vite compatible)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.luna.flowergrid.co.uk";
+
+export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
-  const [openId, setOpenId] = useState(null);
+  const [selectedSummary, setSelectedSummary] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    fetch(`${API_BASE}/admin/summaries`)
-      .then((res) => res.json())
-      .then((data) => {
-        setSummaries(Array.isArray(data) ? data : []);
-      })
-      .catch(console.error);
-  }, []);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const toggle = (id) => {
-    setOpenId((prev) => (prev === id ? null : id));
+  // 🔹 Fetch summaries
+  const fetchSummaries = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/admin/summaries`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        console.error("Failed to fetch summaries");
+        return;
+      }
+
+      const data = await res.json();
+      const safeData = Array.isArray(data) ? data : [];
+      setSummaries(safeData);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
+  // 🔹 Initial load + polling
+  useEffect(() => {
+    fetchSummaries();
+    const interval = setInterval(fetchSummaries, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleViewSummary = (summary) => {
+    setSelectedSummary(summary);
+    setDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setSelectedSummary(null);
+  };
+
+  // Group summaries by user and get latest per user
+  const latestSummaries = Object.values(
+    summaries.reduce((acc, item) => {
+      if (!acc[item.email] ||
+        new Date(item.createdAt) > new Date(acc[item.email].createdAt)) {
+        acc[item.email] = item;
+      }
+      return acc;
+    }, {})
+  );
+
+  const totalProspects = latestSummaries.length;
+  const growthPercentage = 7; // You can calculate this based on your data
+
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: "auto" }}>
-      {/* Page title */}
-      <Typography variant="h4" fontWeight={600} mb={3}>
-        Chat Summaries
-      </Typography>
+    <Box sx={{
+      minHeight: "100vh",
+      bgcolor: "#F5E4C8",
+      display: "flex"
+    }}>
+      {/* Sidebar */}
+      {!isMobile && (
+        <Box sx={{
+          width: 200,
+          bgcolor: "#6B4A2A",
+          color: "white",
+          p: 4,
+          display: "flex",
+          flexDirection: "column",
+        }}>
 
-      {/* Table header */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "260px 320px 200px 60px",
-          px: 2,
-          py: 1.5,
-          fontSize: 13,
-          fontWeight: 600,
-          color: "#6B7280",
-        }}
-      >
-        <div>NAME</div>
-        <div>EMAIL</div>
-        <div>CREATED</div>
-        <div></div>
-      </Box>
-
-      <Divider />
-
-      {/* Rows */}
-      {summaries.map((item) => {
-        const isOpen = openId === item._id;
-
-        return (
-          <Box key={item._id}>
-            {/* Row */}
+          <Box sx={{ mb: 6, textAlign: "center" }}>
             <Box
+              component="img"
+              src={flowerGridLogo}
+              alt="Flower Grid"
               sx={{
-                display: "grid",
-                gridTemplateColumns: "260px 320px 200px 60px",
-                alignItems: "center",
-                px: 2,
-                py: 1.8,
-                borderBottom: "1px solid #E5E7EB",
+                width: 50,
+                mx: "auto",
+                mb: 1,
+              }}
+            />
+            <Typography
+              sx={{
+                fontSize: 14,
+                fontWeight: 300,
+                letterSpacing: 0.5,
+                color: "#EFE6D6",
               }}
             >
-              {/* Name + Avatar */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                <Avatar
-                  src={item.avatar || ""}
-                  sx={{
-                    width: 36,
-                    height: 36,
-                    bgcolor: "#E5E7EB",
-                    color: "#111827",
-                    fontSize: 14,
-                    fontWeight: 600,
-                  }}
+              Flower Grid
+            </Typography>
+          </Box>
+
+
+          {/* Menu Items */}
+          <Box sx={{
+            bgcolor: "#F5E4C8",
+            color: "#6B4A2A",
+            borderRadius: 2,
+            p: 2,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            width: 400,
+          }}>
+            <Box sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 0.5,
+              fontSize: 24,
+            }}>
+              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
+            </Box>
+            <Typography fontWeight={500}>Dashboard</Typography>
+          </Box>
+        </Box>
+      )}
+
+      {/* Main Content */}
+      <Box sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
+        <Box sx={{ maxWidth: 1400, mx: "auto" }}>
+          {/* Header */}
+          <Typography
+            variant="h5"
+            fontWeight={500}
+            sx={{ mb: 3, color: "#6B5744" }}
+          >
+            Hello Samina!
+          </Typography>
+
+          {/* Stats Card */}
+          <Card sx={{
+            mb: 4,
+            p: 3,
+            bgcolor: "#EAD1A8",
+            borderRadius: 3,
+            boxShadow: "none",
+            maxWidth: 300,
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+       
+<Box
+  sx={{
+    width: 60,
+    height: 60,
+    borderRadius: "50%",
+    bgcolor: "#DFBF8E",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  }}
+>
+  <Box
+    component="img"
+    src={PeopleIcon}
+    alt="People"
+    sx={{
+      width: 58,
+      height: 58,
+    }}
+  />
+</Box>
+
+
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#6B5744", mb: 0.5 }}
                 >
-                  {!item.avatar &&
-                    (item.name?.[0]?.toUpperCase() || "U")}
-                </Avatar>
-                <Typography fontSize={14} fontWeight={500}>
-                  {item.name || "Unknown"}
+                  Total Prospects
                 </Typography>
+                <Typography
+                  variant="h4"
+                  fontWeight={700}
+                  sx={{ color: "#6B5744" }}
+                >
+                  {totalProspects}
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <TrendingUpIcon sx={{ fontSize: 16, color: "#4CAF50" }} />
+                  <Typography variant="body2" sx={{ color: "#4CAF50" }}>
+                    {growthPercentage}% this month
+                  </Typography>
+                </Box>
               </Box>
+            </Box>
+          </Card>
 
-              {/* Email */}
-              <Typography fontSize={13} color="text.secondary">
-                {item.email}
+          {/* Table Card */}
+          <Card sx={{
+            borderRadius: 3,
+            bgcolor: "#EAD1A8",
+            boxShadow: "none",
+            overflow: "hidden",
+          }}>
+            <Box sx={{ p: 3, pb: 2 }}>
+              <Typography
+                variant="h6"
+                fontWeight={500}
+                sx={{ color: "#6B5744" }}
+              >
+                All Prospects
               </Typography>
-
-              {/* Created date */}
-              <Typography fontSize={13} color="text.secondary">
-                {new Date(item.createdAt).toLocaleString()}
-              </Typography>
-
-              {/* Eye icon */}
-              <IconButton onClick={() => toggle(item._id)}>
-                {isOpen ? (
-                  <VisibilityOffOutlinedIcon />
-                ) : (
-                  <VisibilityOutlinedIcon />
-                )}
-              </IconButton>
             </Box>
 
-            {/* Summary (hidden until eye click) */}
-            <Collapse in={isOpen}>
-              <Box
-                sx={{
-                  px: 6,
-                  py: 2.5,
-                  bgcolor: "#FAFAFA",
-                  borderBottom: "1px solid #E5E7EB",
-                }}
-              >
-                <Typography
-                  fontSize={14}
-                  lineHeight={1.7}
-                  sx={{ whiteSpace: "pre-wrap" }}
-                >
-                  {item.summary || "No summary available."}
+            {isMobile ? (
+              // Mobile Card View
+              <Box sx={{ p: 2 }}>
+                {latestSummaries.map((item) => (
+                  <Card
+                    key={item._id}
+                    sx={{
+                      mb: 2,
+                      p: 2,
+                      bgcolor: "#EAD1A8",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+                      <Avatar src={item.avatar}>
+                        {!item.avatar && item.name?.[0]}
+                      </Avatar>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography fontWeight={600} sx={{ color: "#6B5744" }}>
+                          {item.name}
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: "#8B7355" }}>
+                          {item.email}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={() => handleViewSummary(item)}
+                      sx={{
+                        bgcolor: "#6B5744",
+                        color: "white",
+                        textTransform: "none",
+                        borderRadius: 2,
+                        "&:hover": {
+                          bgcolor: "#5A4936",
+                        },
+                      }}
+                    >
+                      View Summary
+                    </Button>
+                  </Card>
+                ))}
+              </Box>
+            ) : (
+              // Desktop Table View
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{
+                        color: "#6B5744",
+                        fontWeight: 500,
+                        bgcolor: "#EAD1A8",
+                        borderBottom: "1px solid #D9CDB8",
+                      }}>
+                        Name
+                      </TableCell>
+                      <TableCell sx={{
+                        color: "#6B5744",
+                        fontWeight: 500,
+                        bgcolor: "#EAD1A8",
+                        borderBottom: "1px solid #D9CDB8",
+                      }}>
+                        Location
+                      </TableCell>
+                      <TableCell sx={{
+                        color: "#6B5744",
+                        fontWeight: 500,
+                        bgcolor: "#EAD1A8",
+                        borderBottom: "1px solid #D9CDB8",
+                      }}>
+                        Mail
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          color: "#6B5744",
+                          fontWeight: 500,
+                          bgcolor: "#EAD1A8",
+                          borderBottom: "1px solid #D9CDB8",
+                        }}
+                      >
+                        Summary
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {latestSummaries.map((item, index) => (
+                      <TableRow
+                        key={item._id}
+                        sx={{
+                          bgcolor: index % 2 === 0 ? "#F5F1E8" : "#EAD1A8",
+                          "&:hover": {
+                            bgcolor: "#DFD3BF",
+                          },
+                        }}
+                      >
+                        <TableCell sx={{
+                          borderBottom: "1px solid #D9CDB8",
+                          color: "#6B5744",
+                        }}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                            <Avatar
+                              src={item.avatar || ""}
+                              sx={{ width: 32, height: 32 }}
+                            >
+                              {!item.avatar && item.name?.[0]}
+                            </Avatar>
+                            {item.name}
+                          </Box>
+                        </TableCell>
+                        <TableCell sx={{
+                          borderBottom: "1px solid #D9CDB8",
+                          color: "#6B5744",
+                        }}>
+                          London, UK
+                        </TableCell>
+                        <TableCell sx={{
+                          borderBottom: "1px solid #D9CDB8",
+                          color: "#6B5744",
+                        }}>
+                          {item.email}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ borderBottom: "1px solid #D9CDB8" }}
+                        >
+                          <Button
+                            variant="contained"
+                            onClick={() => handleViewSummary(item)}
+                            sx={{
+                              bgcolor: "#6B5744",
+                              color: "white",
+                              textTransform: "none",
+                              borderRadius: 2,
+                              px: 3,
+                              "&:hover": {
+                                bgcolor: "#5A4936",
+                              },
+                            }}
+                          >
+                            View Summary
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+
+            {/* Empty State */}
+            {latestSummaries.length === 0 && (
+              <Box sx={{ py: 8, textAlign: "center" }}>
+                <PeopleOutlineIcon sx={{ fontSize: 64, color: "#D9CDB8" }} />
+                <Typography sx={{ color: "#8B7355" }}>
+                  No prospects found
                 </Typography>
               </Box>
-            </Collapse>
-          </Box>
-        );
-      })}
+            )}
+          </Card>
+        </Box>
+      </Box>
 
-      {summaries.length === 0 && (
-        <Typography mt={4} color="text.secondary">
-          No summaries found.
-        </Typography>
-      )}
+      {/* Summary Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            bgcolor: "#F5F1E8",
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          color: "#6B5744",
+        }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Avatar src={selectedSummary?.avatar || ""}>
+              {!selectedSummary?.avatar && selectedSummary?.name?.[0]}
+            </Avatar>
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                {selectedSummary?.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {selectedSummary?.email}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={handleCloseDialog}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: "white" }}>
+          <Typography variant="body1" lineHeight={1.8} sx={{ color: "#6B5744" }}>
+            {selectedSummary?.summary || "No summary available."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={handleCloseDialog}
+            variant="contained"
+            sx={{
+              bgcolor: "#6B5744",
+              color: "white",
+              textTransform: "none",
+              borderRadius: 2,
+              px: 3,
+              "&:hover": {
+                bgcolor: "#5A4936",
+              },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

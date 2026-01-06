@@ -18,6 +18,13 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Drawer from "@mui/material/Drawer";
 import MenuIcon from "@mui/icons-material/Menu";
 import AddIcon from "@mui/icons-material/Add";
+import chatIcon from "../assets/chat.svg";
+import testIcon from "../assets/test.svg";
+import bookIcon from "../assets/book.svg";
+import worksheetsIcon from "../assets/worksheets.svg";
+import flowerLogo from "../assets/flower.png";
+import SendIcon from "../assets/icon.svg";
+
 
 
 function TypingIndicator({ bg, color }) {
@@ -108,6 +115,10 @@ export default function ChatScreenMui() {
     const [user, setUser] = useState(null);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const audioRef = useRef(null);
+    const [conversations, setConversations] = useState([]);
+    const [activeConversationId, setActiveConversationId] = useState(null);
+    const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
+
 
 
     const handleSignupClick = (event) => {
@@ -125,16 +136,15 @@ export default function ChatScreenMui() {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
 
+
+
     const menuItems = [
-        { icon: "/chat.svg", label: "Chat with Flora" },
-        { icon: "/test.svg", label: "Self Tests" },
-        { icon: "/book.svg", label: "Book a Therapist" },
-        // { icon: "/focus.svg", label: "Focus Zone" },
-        // { icon: "/care.svg", label: "Self Care" },
-        // { icon: "/music.svg", label: "Music" },
-        // { icon: "/community.svg", label: "Community" },
-        { icon: "/worksheets.svg", label: "Worksheets" },
+        { icon: chatIcon, label: "Chat with Flora" },
+        { icon: testIcon, label: "Self Tests" },
+        { icon: bookIcon, label: "Book a Therapist" },
+        { icon: worksheetsIcon, label: "Worksheets" },
     ];
+
 
     const API_BASE = 'https://api.luna.flowergrid.co.uk';
 
@@ -152,6 +162,28 @@ export default function ChatScreenMui() {
             console.warn("token read failed", err);
         }
     }, []);
+
+    useEffect(() => {
+        return () => {
+            // Runs when ChatScreenMui unmounts
+            sendChatSummary();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!user) return;
+
+        fetch(`${API_BASE}/conversations`, {
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            },
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                setConversations(Array.isArray(data) ? data : []);
+            })
+            .catch(console.error);
+    }, [user]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -179,28 +211,7 @@ export default function ChatScreenMui() {
         }
     }, []);
 
-    useEffect(() => {
-        function handlePageLeave() {
-            const sessionId = sessionStorage.getItem("flora_session_id");
-            if (!sessionId) return;
 
-            navigator.sendBeacon(
-                "https://api.luna.flowergrid.co.uk/chat/summary",
-                JSON.stringify({ sessionId })
-            );
-        }
-
-        window.addEventListener("beforeunload", handlePageLeave);
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "hidden") {
-                handlePageLeave();
-            }
-        });
-
-        return () => {
-            window.removeEventListener("beforeunload", handlePageLeave);
-        };
-    }, []);
 
     useEffect(() => {
         const handleBeforeUnload = () => {
@@ -246,9 +257,12 @@ export default function ChatScreenMui() {
             const transcript = event.results[0][0].transcript?.trim();
             if (!transcript) return;
 
+            setLastInputWasVoice(true);
             setConversationMode(true);
             setInput("");
-            sendToServer(transcript);
+            sendToServer(transcript, true);
+
+
         };
 
         recognitionRef.current = recognition;
@@ -257,15 +271,17 @@ export default function ChatScreenMui() {
             try {
                 recognition.stop();
             } catch {
-                // ignore
+
             }
         };
     }, []);
 
-   
 
 
-    async function sendToServer(text) {
+
+
+    async function sendToServer(text, isVoiceInput = false) {
+
         if (!text) return;
         setConversationMode(true);
         setMessages((m) => [...m, { id: Date.now(), from: "user", text }]);
@@ -274,10 +290,18 @@ export default function ChatScreenMui() {
         const sessionId = getOrCreateSessionId();
 
         try {
+            const sessionId = getOrCreateSessionId();
+
             const resp = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text, sessionId }),
+
+                body: JSON.stringify({
+                    message: text,
+                    sessionId, // 🔥 THIS WAS MISSING
+                }),
+
+
             });
 
             const raw = await resp.text();
@@ -300,17 +324,19 @@ export default function ChatScreenMui() {
             }
 
             const reply =
-  data?.answer || data?.message || "Sorry, something went wrong.";
+                data?.answer || data?.message || "Sorry, something went wrong.";
 
-setMessages((m) => [
-  ...m,
-  { id: Date.now() + 1, from: "bot", text: reply },
-]);
+            setMessages((m) => [
+                ...m,
+                { id: Date.now() + 1, from: "bot", text: reply },
+            ]);
 
-// 🔊 PLAY BOT VOICE (if available)
-if (data?.audio) {
-  playBotVoice(data.audio);
-}
+            if (data?.audio && isVoiceInput) {
+                playBotVoice(data.audio);
+            }
+
+
+
 
         } catch (err) {
             console.error("chat error", err);
@@ -327,59 +353,68 @@ if (data?.audio) {
         }
     }
 
+    function startNewChat() {
+        sendChatSummary(); // 👈 SAVE previous chat
 
- 
-function VoiceWaveformOverlay() {
-  return (
-    <Box
-      sx={{
-        position: "absolute",
-        inset: 0,
-        display: "flex",
-        alignItems: "center",
-        pointerEvents: "none",
-        px: 2.5,
-      }}
-    >
-      {/* dotted baseline */}
-      <Box
-        sx={{
-          position: "absolute",
-          left: 20,
-          right: 20,
-          height: 2,
-          background:
-            "repeating-linear-gradient(to right, rgba(255,255,255,0.6) 0 4px, transparent 4px 8px)",
-          opacity: 0.6,
-        }}
-      />
+        sessionStorage.removeItem("flora_session_id");
 
-      {/* waveform */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: "3px",
-          alignItems: "center",
-          marginLeft: 60,
-        }}
-      >
-        {[...Array(22)].map((_, i) => (
-          <Box
-            key={i}
-            sx={{
-              width: 3,
-              height: `${Math.random() * 22 + 6}px`,
-              borderRadius: 2,
-              backgroundColor: "#fff",
-              opacity: 0.9,
-              animation: "wavePulse 1.2s infinite ease-in-out",
-              animationDelay: `${i * 0.05}s`,
-            }}
-          />
-        ))}
-      </Box>
+        setMessages([]);
+        setActiveConversationId(null);
+        setConversationMode(false);
+    }
 
-      <style>{`
+
+    function VoiceWaveformOverlay() {
+        return (
+            <Box
+                sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    pointerEvents: "none",
+                    px: 2.5,
+                }}
+            >
+                {/* dotted baseline */}
+                <Box
+                    sx={{
+                        position: "absolute",
+                        left: 20,
+                        right: 20,
+                        height: 2,
+                        background:
+                            "repeating-linear-gradient(to right, rgba(255,255,255,0.6) 0 4px, transparent 4px 8px)",
+                        opacity: 0.6,
+                    }}
+                />
+
+                {/* waveform */}
+                <Box
+                    sx={{
+                        display: "flex",
+                        gap: "3px",
+                        alignItems: "center",
+                        marginLeft: 60,
+                    }}
+                >
+                    {[...Array(22)].map((_, i) => (
+                        <Box
+                            key={i}
+                            sx={{
+                                width: 3,
+                                height: `${Math.random() * 22 + 6}px`,
+                                borderRadius: 2,
+                                backgroundColor: "#fff",
+                                opacity: 0.9,
+                                animation: "wavePulse 1.2s infinite ease-in-out",
+                                animationDelay: `${i * 0.05}s`,
+                            }}
+                        />
+                    ))}
+                </Box>
+
+                <style>{`
         @keyframes wavePulse {
           0%, 100% {
             transform: scaleY(0.4);
@@ -391,29 +426,40 @@ function VoiceWaveformOverlay() {
           }
         }
       `}</style>
-    </Box>
-  );
-}
+            </Box>
+        );
+    }
+    function openConversation(conversation) {
+        setActiveConversationId(conversation._id);
+        setConversationMode(true);
 
-
- function playBotVoice(base64Audio) {
-  try {
-    // Stop previous audio if any
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
+        fetch(`${API_BASE}/conversations/${conversation._id}`)
+            .then((res) => res.json())
+            .then((data) => {
+                setMessages(Array.isArray(data.messages) ? data.messages : []);
+            })
+            .catch(console.error);
     }
 
-    const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
-    audioRef.current = audio;
 
-    audio.play().catch(err => {
-      console.warn("Autoplay blocked:", err);
-    });
-  } catch (err) {
-    console.error("Audio play failed:", err);
-  }
-}
+    function playBotVoice(base64Audio) {
+        try {
+            // Stop previous audio if any
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+
+            const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+            audioRef.current = audio;
+
+            audio.play().catch(err => {
+                console.warn("Autoplay blocked:", err);
+            });
+        } catch (err) {
+            console.error("Audio play failed:", err);
+        }
+    }
 
     async function sendChatSummary() {
         try {
@@ -422,12 +468,11 @@ function VoiceWaveformOverlay() {
 
             await fetch("https://api.luna.flowergrid.co.uk/chat/summary", {
                 method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                credentials: "include", // REQUIRED
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ sessionId }),
             });
+
         } catch (err) {
             console.warn("Summary send failed", err);
         }
@@ -439,21 +484,24 @@ function VoiceWaveformOverlay() {
         handleSignupClose();
     }
 
-  function onSubmit(e) {
-  e?.preventDefault();
+    function onSubmit(e) {
+        e?.preventDefault();
 
-  if (audioRef.current) {
-    audioRef.current.pause();
-    audioRef.current = null;
-  }
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
 
-  const trimmed = input.trim();
-  if (!trimmed) return;
+        const trimmed = input.trim();
+        if (!trimmed) return;
 
-  setConversationMode(true);
-  sendToServer(trimmed);
-  setInput("");
-}
+        setLastInputWasVoice(false); // 👈 typed input
+        setConversationMode(true);
+        sendToServer(trimmed, false);
+
+        setInput("");
+    }
+
 
     function onKeyDown(e) {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -480,12 +528,12 @@ function VoiceWaveformOverlay() {
             console.error("Error starting/stopping speech recognition:", err);
         }
     }
-
-    function goToHome() {
+    function startNewChat() {
         setMessages([]);
+        setActiveConversationId(null);
         setConversationMode(false);
-        setInput("");
     }
+
 
     const quickTopics = [
         "Analyse my personality",
@@ -586,13 +634,15 @@ function VoiceWaveformOverlay() {
                     },
                 }}
             >
-                <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
-                    <img src="/logo.svg" alt="logo" style={{ width: 48 }} />
-                </Box>
+              <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+  <img src={flowerLogo} alt="logo" style={{ width: 48 }} />
+</Box>
+
                 {user && (
                     <Box
                         onClick={() => {
-                            goToHome();
+                            startNewChat();
+
                             setMobileDrawerOpen(false);
                         }}
                         sx={{
@@ -623,7 +673,8 @@ function VoiceWaveformOverlay() {
                     <Box
                         key={label}
                         onClick={() => {
-                            if (index === 0) goToHome();
+                            if (index === 0) startNewChat();
+                            ;
                             setMobileDrawerOpen(false);
                         }}
                         sx={{
@@ -671,11 +722,8 @@ function VoiceWaveformOverlay() {
                     }}
                 >
                     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                        <img
-                            src="/logo.svg"
-                            alt="logo"
-                            style={{ width: collapsed ? 46 : 46, height: "auto" }}
-                        />
+                       
+                         <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 46, height: "auto"}} />
                     </Box>
 
                     <Box
@@ -738,9 +786,10 @@ function VoiceWaveformOverlay() {
                             gap: 1.5,
                         }}
                     >
+
                         {user && (
                             <Box
-                                onClick={goToHome}
+                                onClick={startNewChat}
                                 sx={{
                                     display: "flex",
                                     alignItems: "center",
@@ -751,6 +800,42 @@ function VoiceWaveformOverlay() {
                                     mb: 1,
                                 }}
                             >
+                                {conversations.map((c) => (
+                                    <Box
+                                        key={c._id}
+                                        onClick={() => openConversation(c)}
+                                        sx={{
+                                            px: collapsed ? 1 : 2,
+                                            py: 1,
+                                            mx: 1,
+                                            borderRadius: 1.5,
+                                            cursor: "pointer",
+                                            background:
+                                                activeConversationId === c._id
+                                                    ? "rgba(255,255,255,0.12)"
+                                                    : "transparent",
+                                            "&:hover": {
+                                                background: "rgba(255,255,255,0.1)",
+                                            },
+                                        }}
+                                    >
+                                        {!collapsed && (
+                                            <Typography
+                                                sx={{
+                                                    fontSize: 12,
+                                                    fontWeight: 500,
+                                                    color: "rgba(255,255,255,0.95)",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                }}
+                                            >
+                                                {c.title || "New conversation"}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                ))}
+
                                 <IconButton
                                     sx={{
                                         color: "#EDDBBF",
@@ -786,7 +871,7 @@ function VoiceWaveformOverlay() {
                         {menuItems.map(({ icon, label }, index) => (
                             <Box
                                 key={label}
-                                onClick={index === 0 ? goToHome : undefined}
+                                onClick={index === 0 ? startNewChat : undefined}
                                 sx={{
                                     display: "flex",
                                     alignItems: "center",
@@ -1083,7 +1168,7 @@ function VoiceWaveformOverlay() {
 
                         {isMobile ? (
                             <>
-                                <Box sx={{ height: 200 }} />
+                                <Box sx={{ height: 100 }} />
 
                                 <Typography
                                     variant="h6"
@@ -1110,7 +1195,96 @@ function VoiceWaveformOverlay() {
                                 >
                                     your AI Mental Health Companion
                                 </Typography>
-                                <Box sx={{ height: 340 }} />
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        textAlign: "center",
+                                        fontStyle: "italic",
+                                        mb: 2,
+                                        color: "#4E351A",
+                                        fontFamily: "Poppins",
+                                        fontSize: 14,
+                                        mt: 20,
+                                    }}
+                                >
+                                    What people talk about most.
+                                </Typography>
+
+
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "center",
+                                        mt: 1,
+                                    }}
+                                >
+                                    {quickTopics.slice(0, 3).map((t) => (
+                                        <Chip
+                                            key={t}
+                                            label={t}
+                                            onClick={() => setInput(t)}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: 99,
+                                                borderColor: "#9E7F49",
+                                                background: "transparent",
+                                                color: "rgba(80, 57, 32, 0.6)",
+                                                px: 0,
+                                                minWidth: 100,
+                                                "& .MuiChip-label": {
+                                                    py: 0.7,
+                                                    fontSize: 12,
+                                                    fontFamily: "Poppins",
+                                                },
+                                            }}
+                                        />
+                                    ))}
+                                </Box>
+                                <Box
+                                    sx={{
+                                        display: "flex",
+                                        gap: 2,
+                                        justifyContent: "center",
+                                        mt: 2,
+                                    }}
+                                >
+                                    {quickTopics.slice(3, 5).map((t) => (
+                                        <Chip
+                                            key={t}
+                                            label={t}
+                                            onClick={() => setInput(t)}
+                                            variant="outlined"
+                                            sx={{
+                                                borderRadius: 99,
+                                                borderColor: "#9E7F49",
+                                                background: "transparent",
+                                                color: "rgba(80, 57, 32, 0.6)",
+                                                px: 0,
+                                                minWidth: 100,
+                                                "& .MuiChip-label": {
+                                                    py: 0.7,
+                                                    fontSize: 12,
+                                                    fontFamily: "Poppins",
+                                                },
+                                            }}
+                                        />
+                                    ))}
+                                </Box>
+                                <Box sx={{ height: 100 }} />
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        mb: 1,
+                                        textAlign: "center",
+                                        color: "#826840",
+                                        fontSize: 14,
+                                        fontWeight: 100,
+                                    }}
+                                >
+                                    Disclaimer: Flora offers support, not medical care.<br />
+                                    Always consult a professional.
+                                </Typography>
                             </>
                         ) : (
                             <Typography
@@ -1148,6 +1322,7 @@ function VoiceWaveformOverlay() {
                                 I'm here to support your emotional health in any way I can!
                             </Typography>
                         )}
+
 
                         <Box
                             component="form"
@@ -1207,7 +1382,7 @@ function VoiceWaveformOverlay() {
                                         disabled={sending || isListening}
                                     />
 
-  {isListening && <VoiceWaveformOverlay />}
+                                    {isListening && <VoiceWaveformOverlay />}
 
 
 
@@ -1299,7 +1474,7 @@ function VoiceWaveformOverlay() {
                                 >
                                     <Box
                                         component="img"
-                                        src="/icon.svg"
+                                        src={SendIcon}
                                         alt="send icon"
                                         sx={{
                                             width: 22,
@@ -1706,7 +1881,7 @@ function VoiceWaveformOverlay() {
                                         >
                                             <Box
                                                 component="img"
-                                                src="/icon.svg"
+                                                src={SendIcon}
                                                 alt="send icon"
                                                 sx={{
                                                     width: 22,
