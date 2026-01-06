@@ -151,7 +151,7 @@ async function generateChatSummary(messages) {
   if (!messages.length) return '';
 
   const conversation = messages
-    .map(m => `${m.role === 'user' ? 'User' : 'Flora'}: ${m.content}`)
+    .map(m => `${m.role === 'user' ? 'User' : 'Luna'}: ${m.content}`)
     .join('\n');
 
   const resp = await openai.chat.completions.create({
@@ -579,5 +579,5 @@ await connectDB();
 
 app.listen(PORT, async () => {
   await buildIndex();
-  console.log(`🌼 Flora is live at http://localhost:${PORT}`);
+  console.log(`🌼 luna is live at http://localhost:${PORT}`);
 });
