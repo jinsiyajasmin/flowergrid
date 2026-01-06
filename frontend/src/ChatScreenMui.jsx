@@ -1319,7 +1319,7 @@ export default function ChatScreenMui() {
                                     px: 2,
                                 }}
                             >
-                                I'm here to support your emotional health in any way I can!
+                                I'm here to support your emotional health in any way I can.!
                             </Typography>
                         )}
 
