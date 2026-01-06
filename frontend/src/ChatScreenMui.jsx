@@ -466,7 +466,7 @@ export default function ChatScreenMui() {
             const sessionId = sessionStorage.getItem("flora_session_id");
             if (!sessionId) return;
 
-            await fetch("https://api.luna.flowergrid.co.uk/chat/summary", {
+            await fetch("http://localhost:3001/chat/summary", {
                 method: "POST",
                 credentials: "include", // REQUIRED
                 headers: { "Content-Type": "application/json" },
