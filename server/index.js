@@ -23,6 +23,7 @@ const KB_EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
 const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
 const KB_EMBED_CHUNK_OVERLAP = 200;
+const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'https://luna.flowergrid.co.uk',
@@ -76,7 +77,7 @@ passport.use(
         });
 
         if (existingUser) {
-          existingUser.lastLogin = new Date();
+          existingUser.lastLogin = new Date(); 
           await existingUser.save();
           return done(null, existingUser);
         }
@@ -280,13 +281,20 @@ function detectPricing(text) {
 
 
 const SESSION_CONTEXT = new Map();
-
 function addToSession(sessionId, role, content) {
   if (!sessionId) return;
-  const arr = SESSION_CONTEXT.get(sessionId) || [];
-  arr.push({ role, content });
-  SESSION_CONTEXT.set(sessionId, arr.slice(-SESSION_MAX_MESSAGES));
+
+  // Short context for chat
+  const shortArr = SESSION_CONTEXT.get(sessionId) || [];
+  shortArr.push({ role, content });
+  SESSION_CONTEXT.set(sessionId, shortArr.slice(-SESSION_MAX_MESSAGES));
+
+  // Full context for summary
+  const fullArr = SUMMARY_CONTEXT.get(sessionId) || [];
+  fullArr.push({ role, content });
+  SUMMARY_CONTEXT.set(sessionId, fullArr);
 }
+
 
 function getSessionMessages(sessionId) {
   if (!sessionId) return [];
@@ -551,29 +559,55 @@ app.post("/chat/summary", async (req, res) => {
       return res.status(400).json({ error: "Session ID required" });
     }
 
-    const messages = getSessionMessages(sessionId);
+  
+    const alreadySaved = await ChatSummary.findOne({
+      userId: req.user._id,
+      sessionId,
+    });
+
+    if (alreadySaved) {
+      return res.json({ success: true, skipped: true });
+    }
+
+    const messages = SUMMARY_CONTEXT.get(sessionId) || [];
     if (!messages.length) {
       return res.json({ success: true });
     }
 
     const summary = await generateChatSummary(messages);
 
-    if (summary) {
-      await ChatSummary.create({
-        userId: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        avatar: req.user.avatar,
-        summary,
-      });
-    }
+    const fullConversation = messages.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    await ChatSummary.create({
+      userId: req.user._id,
+      sessionId, // 👈 critical
+      name: req.user.name,
+      email: req.user.email,
+      avatar: req.user.avatar,
+      summary,
+      messages: fullConversation,
+    });
+
+    // 🧹 Clear memory after save
+    SUMMARY_CONTEXT.delete(sessionId);
 
     res.json({ success: true });
   } catch (err) {
+    // Duplicate protection fallback
+    if (err.code === 11000) {
+      return res.json({ success: true, skipped: true });
+    }
+
     console.error("Summary save error:", err);
     res.status(500).json({ error: "Failed to save summary" });
   }
 });
+
+
+
 
 await connectDB();
 

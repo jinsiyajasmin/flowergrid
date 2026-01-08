@@ -12,7 +12,6 @@ import {
 import InteractiveSvgAvatar from "./InteractiveSvgAvatar";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import GoogleIcon from "@mui/icons-material/Google";
 import Button from "@mui/material/Button";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Drawer from "@mui/material/Drawer";
@@ -119,6 +118,7 @@ export default function ChatScreenMui() {
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
 
+    const summarySentRef = useRef(false);
 
 
     const handleSignupClick = (event) => {
@@ -276,10 +276,6 @@ export default function ChatScreenMui() {
         };
     }, []);
 
-
-
-
-
     async function sendToServer(text, isVoiceInput = false) {
 
         if (!text) return;
@@ -353,8 +349,10 @@ export default function ChatScreenMui() {
         }
     }
 
-    function startNewChat() {
-        sendChatSummary(); // 👈 SAVE previous chat
+    async function startNewChat() {
+        try {
+            await sendChatSummary();
+        } catch { }
 
         sessionStorage.removeItem("flora_session_id");
 
@@ -362,7 +360,6 @@ export default function ChatScreenMui() {
         setActiveConversationId(null);
         setConversationMode(false);
     }
-
 
     function VoiceWaveformOverlay() {
         return (
@@ -376,7 +373,7 @@ export default function ChatScreenMui() {
                     px: 2.5,
                 }}
             >
-                {/* dotted baseline */}
+            
                 <Box
                     sx={{
                         position: "absolute",
@@ -463,26 +460,29 @@ export default function ChatScreenMui() {
 
     async function sendChatSummary() {
         try {
+            if (!user || !messages.length) return;
+
             const sessionId = sessionStorage.getItem("flora_session_id");
             if (!sessionId) return;
 
-            await fetch("http://localhost:3001/chat/summary", {
+            await fetch(`${API_BASE}/chat/summary`, {
                 method: "POST",
-                credentials: "include", // REQUIRED
+                credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ sessionId }),
+                body: JSON.stringify({
+                    sessionId,
+                    messages, // 🔥 SEND FULL CHAT
+                }),
             });
 
+            sessionStorage.removeItem("flora_session_id");
         } catch (err) {
             console.warn("Summary send failed", err);
         }
     }
 
-    function handleLogout() {
-        localStorage.removeItem("flora_user");
-        setUser(null);
-        handleSignupClose();
-    }
+
+
 
     function onSubmit(e) {
         e?.preventDefault();
@@ -510,6 +510,24 @@ export default function ChatScreenMui() {
         }
     }
 
+
+    async function handleLogout() {
+        try {
+            await sendChatSummary(); // 🔥 save summary before logout
+        } catch (e) {
+            console.warn("Summary save failed on logout", e);
+        }
+
+        localStorage.removeItem("flora_user");
+        sessionStorage.removeItem("flora_session_id");
+
+        setUser(null);
+        setMessages([]);
+        setConversationMode(false);
+        setActiveConversationId(null);
+        handleSignupClose();
+    }
+
     function handleMicClick() {
         const recognition = recognitionRef.current;
 
@@ -528,12 +546,13 @@ export default function ChatScreenMui() {
             console.error("Error starting/stopping speech recognition:", err);
         }
     }
-    function startNewChat() {
-        setMessages([]);
-        setActiveConversationId(null);
-        setConversationMode(false);
-    }
 
+
+    useEffect(() => {
+        const handler = () => sendChatSummary();
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    }, []);
 
     const quickTopics = [
         "Analyse my personality",
@@ -634,9 +653,9 @@ export default function ChatScreenMui() {
                     },
                 }}
             >
-              <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
-  <img src={flowerLogo} alt="logo" style={{ width: 48 }} />
-</Box>
+                <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
+                    <img src={flowerLogo} alt="logo" style={{ width: 48 }} />
+                </Box>
 
                 {user && (
                     <Box
@@ -722,8 +741,8 @@ export default function ChatScreenMui() {
                     }}
                 >
                     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                       
-                         <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 46, height: "auto"}} />
+
+                        <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 46, height: "auto" }} />
                     </Box>
 
                     <Box

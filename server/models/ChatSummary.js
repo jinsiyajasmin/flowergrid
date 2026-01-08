@@ -1,29 +1,37 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-const chatSummarySchema = new mongoose.Schema(
+const ChatSummarySchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
     },
 
-    name: {
+    sessionId: {
       type: String,
       required: true,
     },
 
-    email: {
-      type: String,
-      required: true,
-    },
+    name: String,
+    email: String,
+    avatar: String,
 
-    summary: {
-      type: String,
-      required: true,
-    },
+    summary: String,
+
+    messages: [
+      {
+        role: String,
+        content: String,
+      },
+    ],
   },
   { timestamps: true }
 );
 
-export default mongoose.model('ChatSummary', chatSummarySchema);
+ChatSummarySchema.index(
+  { userId: 1, sessionId: 1 },
+  { unique: true }
+);
+
+export default mongoose.model("ChatSummary", ChatSummarySchema);

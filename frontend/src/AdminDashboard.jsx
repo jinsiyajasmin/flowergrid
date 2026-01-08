@@ -24,13 +24,12 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import flowerGridLogo from "../assets/flower.png"; // update path
-import PeopleIcon from "../assets/none.png"; // update path
+import flowerGridLogo from "../assets/flower.png"; 
+import PeopleIcon from "../assets/none.png"; 
 
 
 
 
-// ✅ API base (Vite compatible)
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.luna.flowergrid.co.uk";
 
 export default function AdminDashboard() {
@@ -41,7 +40,6 @@ export default function AdminDashboard() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // 🔹 Fetch summaries
   const fetchSummaries = async () => {
     try {
       const res = await fetch(`${API_BASE}/admin/summaries`, {
@@ -62,36 +60,44 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🔹 Initial load + polling
   useEffect(() => {
     fetchSummaries();
     const interval = setInterval(fetchSummaries, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  const handleViewSummary = (summary) => {
-    setSelectedSummary(summary);
+  const handleViewSummary = (userEmail) => {
+    const userSummaries = summariesByUser[userEmail] || [];
+    const sorted = [...userSummaries].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    setSelectedSummary(sorted);
     setDialogOpen(true);
   };
+
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setSelectedSummary(null);
   };
 
-  // Group summaries by user and get latest per user
-  const latestSummaries = Object.values(
-    summaries.reduce((acc, item) => {
-      if (!acc[item.email] ||
-        new Date(item.createdAt) > new Date(acc[item.email].createdAt)) {
-        acc[item.email] = item;
-      }
-      return acc;
-    }, {})
+  const summariesByUser = summaries.reduce((acc, item) => {
+    if (!acc[item.email]) {
+      acc[item.email] = [];
+    }
+    acc[item.email].push(item);
+    return acc;
+  }, {});
+
+  const usersForTable = Object.values(summariesByUser).map(userSummaries =>
+    userSummaries.sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    )[0]
   );
 
-  const totalProspects = latestSummaries.length;
-  const growthPercentage = 7; // You can calculate this based on your data
+const totalProspects = usersForTable.length;
+
+  const growthPercentage = 7; 
 
   return (
     <Box sx={{
@@ -99,7 +105,6 @@ export default function AdminDashboard() {
       bgcolor: "#F5E4C8",
       display: "flex"
     }}>
-      {/* Sidebar */}
       {!isMobile && (
         <Box sx={{
           width: 200,
@@ -134,7 +139,6 @@ export default function AdminDashboard() {
           </Box>
 
 
-          {/* Menu Items */}
           <Box sx={{
             bgcolor: "#F5E4C8",
             color: "#6B4A2A",
@@ -151,20 +155,18 @@ export default function AdminDashboard() {
               gap: 0.5,
               fontSize: 24,
             }}>
-              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#EAD1A8", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
+              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
             </Box>
             <Typography fontWeight={500}>Dashboard</Typography>
           </Box>
         </Box>
       )}
 
-      {/* Main Content */}
       <Box sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
         <Box sx={{ maxWidth: 1400, mx: "auto" }}>
-          {/* Header */}
           <Typography
             variant="h5"
             fontWeight={500}
@@ -173,7 +175,6 @@ export default function AdminDashboard() {
             Hello Samina!
           </Typography>
 
-          {/* Stats Card */}
           <Card sx={{
             mb: 4,
             p: 3,
@@ -183,28 +184,28 @@ export default function AdminDashboard() {
             maxWidth: 300,
           }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-       
-<Box
-  sx={{
-    width: 60,
-    height: 60,
-    borderRadius: "50%",
-    bgcolor: "#DFBF8E",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  }}
->
-  <Box
-    component="img"
-    src={PeopleIcon}
-    alt="People"
-    sx={{
-      width: 58,
-      height: 58,
-    }}
-  />
-</Box>
+
+              <Box
+                sx={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: "50%",
+                  bgcolor: "#DFBF8E",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Box
+                  component="img"
+                  src={PeopleIcon}
+                  alt="People"
+                  sx={{
+                    width: 58,
+                    height: 58,
+                  }}
+                />
+              </Box>
 
 
               <Box>
@@ -231,7 +232,6 @@ export default function AdminDashboard() {
             </Box>
           </Card>
 
-          {/* Table Card */}
           <Card sx={{
             borderRadius: 3,
             bgcolor: "#EAD1A8",
@@ -249,9 +249,9 @@ export default function AdminDashboard() {
             </Box>
 
             {isMobile ? (
-              // Mobile Card View
               <Box sx={{ p: 2 }}>
-                {latestSummaries.map((item) => (
+                {usersForTable.map((item) => (
+
                   <Card
                     key={item._id}
                     sx={{
@@ -277,7 +277,8 @@ export default function AdminDashboard() {
                     <Button
                       fullWidth
                       variant="contained"
-                      onClick={() => handleViewSummary(item)}
+                      onClick={() => handleViewSummary(item.email)}
+
                       sx={{
                         bgcolor: "#6B5744",
                         color: "white",
@@ -294,7 +295,6 @@ export default function AdminDashboard() {
                 ))}
               </Box>
             ) : (
-              // Desktop Table View
               <TableContainer>
                 <Table>
                   <TableHead>
@@ -307,14 +307,7 @@ export default function AdminDashboard() {
                       }}>
                         Name
                       </TableCell>
-                      <TableCell sx={{
-                        color: "#6B5744",
-                        fontWeight: 500,
-                        bgcolor: "#EAD1A8",
-                        borderBottom: "1px solid #D9CDB8",
-                      }}>
-                        Location
-                      </TableCell>
+
                       <TableCell sx={{
                         color: "#6B5744",
                         fontWeight: 500,
@@ -337,7 +330,8 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {latestSummaries.map((item, index) => (
+                   {usersForTable.map((item, index) => (
+
                       <TableRow
                         key={item._id}
                         sx={{
@@ -361,12 +355,7 @@ export default function AdminDashboard() {
                             {item.name}
                           </Box>
                         </TableCell>
-                        <TableCell sx={{
-                          borderBottom: "1px solid #D9CDB8",
-                          color: "#6B5744",
-                        }}>
-                          London, UK
-                        </TableCell>
+
                         <TableCell sx={{
                           borderBottom: "1px solid #D9CDB8",
                           color: "#6B5744",
@@ -379,7 +368,8 @@ export default function AdminDashboard() {
                         >
                           <Button
                             variant="contained"
-                            onClick={() => handleViewSummary(item)}
+                            onClick={() => handleViewSummary(item.email)}
+
                             sx={{
                               bgcolor: "#6B5744",
                               color: "white",
@@ -401,8 +391,8 @@ export default function AdminDashboard() {
               </TableContainer>
             )}
 
-            {/* Empty State */}
-            {latestSummaries.length === 0 && (
+            {usersForTable.length === 0 && (
+
               <Box sx={{ py: 8, textAlign: "center" }}>
                 <PeopleOutlineIcon sx={{ fontSize: 64, color: "#D9CDB8" }} />
                 <Typography sx={{ color: "#8B7355" }}>
@@ -414,7 +404,6 @@ export default function AdminDashboard() {
         </Box>
       </Box>
 
-      {/* Summary Dialog */}
       <Dialog
         open={dialogOpen}
         onClose={handleCloseDialog}
@@ -439,7 +428,8 @@ export default function AdminDashboard() {
             </Avatar>
             <Box>
               <Typography variant="h6" fontWeight={600}>
-                {selectedSummary?.name}
+              selectedSummary?.[0]?.name
+
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {selectedSummary?.email}
@@ -450,11 +440,31 @@ export default function AdminDashboard() {
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ bgcolor: "white" }}>
-          <Typography variant="body1" lineHeight={1.8} sx={{ color: "#6B5744" }}>
-            {selectedSummary?.summary || "No summary available."}
-          </Typography>
-        </DialogContent>
+       <DialogContent dividers sx={{ bgcolor: "white" }}>
+  {selectedSummary?.map((item, index) => (
+    <Box key={item._id} sx={{ mb: 3 }}>
+      <Typography
+        variant="caption"
+        sx={{ color: "#8B7355", display: "block", mb: 1 }}
+      >
+        {new Date(item.createdAt).toLocaleString()}
+      </Typography>
+
+      <Typography
+        variant="body1"
+        lineHeight={1.8}
+        sx={{ color: "#6B5744" }}
+      >
+        {item.summary || "No summary available."}
+      </Typography>
+
+      {index !== selectedSummary.length - 1 && (
+        <Box sx={{ my: 2, borderBottom: "1px solid #EAD1A8" }} />
+      )}
+    </Box>
+  ))}
+</DialogContent>
+
         <DialogActions sx={{ p: 2 }}>
           <Button
             onClick={handleCloseDialog}
