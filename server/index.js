@@ -27,11 +27,14 @@ const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk' 
+  'https://api.luna.flowergrid.co.uk'
 ];
 
 app.use(cors({
-  origin: ['http://localhost:4000', 'http://localhost:5173', 'https://luna.flowergrid.co.uk',
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:4000',
+    'https://luna.flowergrid.co.uk',
     'https://api.luna.flowergrid.co.uk'
   ],
   credentials: true
@@ -77,7 +80,7 @@ passport.use(
         });
 
         if (existingUser) {
-          existingUser.lastLogin = new Date(); 
+          existingUser.lastLogin = new Date();
           await existingUser.save();
           return done(null, existingUser);
         }
@@ -97,7 +100,7 @@ passport.use(
   )
 );
 
- 
+
 passport.serializeUser((user, done) => {
   done(null, user);
 });
@@ -117,9 +120,9 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    const user = req.user; // comes from MongoDB
-const frontendUrl = 'https://luna.flowergrid.co.uk';
- // Change to your frontend URL
+    const user = req.user;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
 
     const userPayload = {
       id: user._id,
@@ -173,6 +176,33 @@ async function generateChatSummary(messages) {
   });
 
   return resp?.choices?.[0]?.message?.content?.trim() || '';
+}
+
+async function generateChatTitle(messages) {
+  if (!messages.length) return '';
+
+  const conversation = messages
+    .map(m => `${m.role === 'user' ? 'User' : 'Luna'}: ${m.content}`)
+    .join('\n');
+
+  const resp = await openai.chat.completions.create({
+    model: process.env.CHAT_MODEL || 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Generate a strictly short title (exactly 2 words) that captures the gist of this conversation context (e.g. "Work Anxiety", "Daily Stress"). Do not use quotes.',
+      },
+      {
+        role: 'user',
+        content: conversation.slice(0, 4000),
+      },
+    ],
+    temperature: 0.3,
+    max_completion_tokens: 20,
+  });
+
+  return resp?.choices?.[0]?.message?.content?.trim() || 'New Chat';
 }
 
 
@@ -493,7 +523,10 @@ app.post('/chat', async (req, res) => {
     // 🔒 Limit free messages
     if (!loggedIn && botReplyCount >= 8) {
       addToSession(sessionId, 'assistant', LOGIN_REQUIRED_MESSAGE);
-      return res.json({ answer: LOGIN_REQUIRED_MESSAGE });
+      return res.json({
+        answer: LOGIN_REQUIRED_MESSAGE,
+        disableInput: true
+      });
     }
 
     const distressFlag = detectDistress(text);
@@ -546,6 +579,75 @@ app.get("/admin/summaries", async (req, res) => {
   }
 });
 
+app.get("/conversations", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    // Return lightweight list
+    const convos = await ChatSummary.find({ userId: req.user._id })
+      .select("summary title createdAt")
+      .sort({ createdAt: -1 });
+
+    // Map to a friendlier format if needed, or send as is
+    const formatted = convos.map(c => ({
+      _id: c._id,
+      title: c.title || c.summary || "New Conversation",
+      createdAt: c.createdAt
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch conversations" });
+  }
+});
+
+app.get("/conversations/:id", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const conversation = await ChatSummary.findOne({
+      _id: req.params.id,
+      userId: req.user._id
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    res.json(conversation);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch conversation" });
+  }
+});
+
+app.delete("/conversations/:id", async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const { id } = req.params;
+    const result = await ChatSummary.deleteOne({
+      _id: id,
+      userId: req.user._id
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete conversation" });
+  }
+});
+
 
 
 app.post("/chat/summary", async (req, res) => {
@@ -554,42 +656,48 @@ app.post("/chat/summary", async (req, res) => {
       return res.status(401).json({ error: "Not authenticated" });
     }
 
-    const { sessionId } = req.body;
+    const { sessionId, messages: bodyMessages } = req.body;
     if (!sessionId) {
       return res.status(400).json({ error: "Session ID required" });
     }
 
-  
-    const alreadySaved = await ChatSummary.findOne({
-      userId: req.user._id,
-      sessionId,
-    });
-
-    if (alreadySaved) {
-      return res.json({ success: true, skipped: true });
+    // Use client payload if available (it has full history), otherwise fallback to server context
+    let messages = [];
+    if (bodyMessages && Array.isArray(bodyMessages) && bodyMessages.length > 0) {
+      messages = bodyMessages;
+    } else {
+      messages = SUMMARY_CONTEXT.get(sessionId) || [];
     }
 
-    const messages = SUMMARY_CONTEXT.get(sessionId) || [];
     if (!messages.length) {
       return res.json({ success: true });
     }
 
     const summary = await generateChatSummary(messages);
+    const title = await generateChatTitle(messages);
 
     const fullConversation = messages.map(m => ({
       role: m.role,
       content: m.content,
     }));
 
-    await ChatSummary.create({
-      userId: req.user._id,
-      sessionId, // 👈 critical
-      name: req.user.name,
-      email: req.user.email,
-      avatar: req.user.avatar,
-      summary,
-      messages: fullConversation,
-    });
+    // Use findOneAndUpdate with upsert to create or update existing summary for this session
+    // This prevents duplicates if user continues same session
+    await ChatSummary.findOneAndUpdate(
+      { sessionId, userId: req.user._id },
+      {
+        $set: {
+          name: req.user.name,
+          email: req.user.email,
+          avatar: req.user.avatar,
+          summary, // Full summary
+          title,   // Short 2-word title
+          messages: fullConversation,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true, new: true }
+    );
 
     // 🧹 Clear memory after save
     SUMMARY_CONTEXT.delete(sessionId);
@@ -613,5 +721,5 @@ await connectDB();
 
 app.listen(PORT, async () => {
   await buildIndex();
-  console.log(`🌼 luna is live at http://localhost:${PORT}`);
+  console.log(`🌼 Luna is live at ${PORT}`);
 });

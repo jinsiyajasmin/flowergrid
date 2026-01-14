@@ -24,8 +24,8 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import flowerGridLogo from "../assets/flower.png"; 
-import PeopleIcon from "../assets/none.png"; 
+import flowerGridLogo from "../assets/flower.png";
+import PeopleIcon from "../assets/none.png";
 
 
 
@@ -95,9 +95,9 @@ export default function AdminDashboard() {
     )[0]
   );
 
-const totalProspects = usersForTable.length;
+  const totalProspects = usersForTable.length;
 
-  const growthPercentage = 7; 
+  const growthPercentage = 7;
 
   return (
     <Box sx={{
@@ -330,7 +330,7 @@ const totalProspects = usersForTable.length;
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                   {usersForTable.map((item, index) => (
+                    {usersForTable.map((item, index) => (
 
                       <TableRow
                         key={item._id}
@@ -428,8 +428,7 @@ const totalProspects = usersForTable.length;
             </Avatar>
             <Box>
               <Typography variant="h6" fontWeight={600}>
-              selectedSummary?.[0]?.name
-
+                {selectedSummary?.[0]?.name}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {selectedSummary?.email}
@@ -440,30 +439,30 @@ const totalProspects = usersForTable.length;
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-       <DialogContent dividers sx={{ bgcolor: "white" }}>
-  {selectedSummary?.map((item, index) => (
-    <Box key={item._id} sx={{ mb: 3 }}>
-      <Typography
-        variant="caption"
-        sx={{ color: "#8B7355", display: "block", mb: 1 }}
-      >
-        {new Date(item.createdAt).toLocaleString()}
-      </Typography>
+        <DialogContent dividers sx={{ bgcolor: "white" }}>
+          {selectedSummary?.map((item, index) => (
+            <Box key={item._id} sx={{ mb: 3 }}>
+              <Typography
+                variant="caption"
+                sx={{ color: "#8B7355", display: "block", mb: 1 }}
+              >
+                {new Date(item.createdAt).toLocaleString()}
+              </Typography>
 
-      <Typography
-        variant="body1"
-        lineHeight={1.8}
-        sx={{ color: "#6B5744" }}
-      >
-        {item.summary || "No summary available."}
-      </Typography>
+              <Typography
+                variant="body1"
+                lineHeight={1.8}
+                sx={{ color: "#6B5744" }}
+              >
+                {item.summary || "No summary available."}
+              </Typography>
 
-      {index !== selectedSummary.length - 1 && (
-        <Box sx={{ my: 2, borderBottom: "1px solid #EAD1A8" }} />
-      )}
-    </Box>
-  ))}
-</DialogContent>
+              {index !== selectedSummary.length - 1 && (
+                <Box sx={{ my: 2, borderBottom: "1px solid #EAD1A8" }} />
+              )}
+            </Box>
+          ))}
+        </DialogContent>
 
         <DialogActions sx={{ p: 2 }}>
           <Button

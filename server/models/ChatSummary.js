@@ -18,6 +18,7 @@ const ChatSummarySchema = new mongoose.Schema(
     avatar: String,
 
     summary: String,
+    title: String,
 
     messages: [
       {

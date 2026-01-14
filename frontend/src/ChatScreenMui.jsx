@@ -8,6 +8,13 @@ import {
     Paper,
     TextField,
     Chip,
+    Tooltip,
+    InputAdornment,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
 } from "@mui/material";
 import InteractiveSvgAvatar from "./InteractiveSvgAvatar";
 import Menu from "@mui/material/Menu";
@@ -17,6 +24,11 @@ import useMediaQuery from "@mui/material/useMediaQuery";
 import Drawer from "@mui/material/Drawer";
 import MenuIcon from "@mui/icons-material/Menu";
 import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import chatIcon from "../assets/chat.svg";
 import testIcon from "../assets/test.svg";
 import bookIcon from "../assets/book.svg";
@@ -26,14 +38,14 @@ import SendIcon from "../assets/icon.svg";
 
 
 
-function TypingIndicator({ bg, color }) {
+function TypingIndicator({ bg, color, isAdornment }) {
     return (
         <Box
             sx={{
                 display: "flex",
-                gap: 1,
+                gap: isAdornment ? 0.6 : 1,
                 alignItems: "center",
-                padding: "8px 12px",
+                padding: isAdornment ? "4px 8px" : "8px 12px",
                 backgroundColor: bg,
                 color,
                 borderRadius: "18px",
@@ -42,8 +54,8 @@ function TypingIndicator({ bg, color }) {
         >
             <Box
                 sx={{
-                    width: 6,
-                    height: 6,
+                    width: isAdornment ? 5 : 6,
+                    height: isAdornment ? 5 : 6,
                     borderRadius: "50%",
                     bgcolor: color,
                     animation: "dotPulse 1.4s infinite",
@@ -51,8 +63,8 @@ function TypingIndicator({ bg, color }) {
             />
             <Box
                 sx={{
-                    width: 6,
-                    height: 6,
+                    width: isAdornment ? 5 : 6,
+                    height: isAdornment ? 5 : 6,
                     borderRadius: "50%",
                     bgcolor: color,
                     animation: "dotPulse 1.4s infinite",
@@ -61,8 +73,8 @@ function TypingIndicator({ bg, color }) {
             />
             <Box
                 sx={{
-                    width: 6,
-                    height: 6,
+                    width: isAdornment ? 5 : 6,
+                    height: isAdornment ? 5 : 6,
                     borderRadius: "50%",
                     bgcolor: color,
                     animation: "dotPulse 1.4s infinite",
@@ -112,11 +124,14 @@ export default function ChatScreenMui() {
     const [signupAnchorEl, setSignupAnchorEl] = useState(null);
     const signupOpen = Boolean(signupAnchorEl);
     const [user, setUser] = useState(null);
-    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
     const audioRef = useRef(null);
     const [conversations, setConversations] = useState([]);
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
+    const [inputDisabled, setInputDisabled] = useState(false);
+    const [voiceTranscript, setVoiceTranscript] = useState(""); // temp transcript
+    const [isSpeaking, setIsSpeaking] = useState(false); // For animation toggle
 
     const summarySentRef = useRef(false);
 
@@ -131,7 +146,12 @@ export default function ChatScreenMui() {
 
     const isMobile = useMediaQuery("(max-width:900px)");
     const [conversationMode, setConversationMode] = useState(false);
-    const [collapsed, setCollapsed] = useState(true);
+    const [mobileOpen, setMobileOpen] = useState(false); // Mobile drawer state
+    const [collapsed, setCollapsed] = useState(false); // Default open
+
+    // Delete Confirmation Dialog State
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [idToDelete, setIdToDelete] = useState(null);
 
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
@@ -146,7 +166,7 @@ export default function ChatScreenMui() {
     ];
 
 
-    const API_BASE = 'https://api.luna.flowergrid.co.uk';
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.luna.flowergrid.co.uk";
 
     useEffect(() => {
         try {
@@ -174,11 +194,12 @@ export default function ChatScreenMui() {
         if (!user) return;
 
         fetch(`${API_BASE}/conversations`, {
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
-            },
+            credentials: "include"
         })
-            .then((res) => res.json())
+            .then((res) => {
+                if (res.status === 401) return [];
+                return res.json();
+            })
             .then((data) => {
                 setConversations(Array.isArray(data) ? data : []);
             })
@@ -222,7 +243,9 @@ export default function ChatScreenMui() {
 
         return () => {
             window.removeEventListener("beforeunload", handleBeforeUnload);
-            sendChatSummary();
+            // We don't call sendChatSummary here again if we want to avoid double-send on component unmount vs page unload
+            // But since keepalive is specific to page unload, it's safer to leave it in the unmount effect above 
+            // or just rely on 'beforeunload' for page exits.
         };
     }, []);
 
@@ -237,32 +260,67 @@ export default function ChatScreenMui() {
 
         const recognition = new SpeechRecognition();
         recognition.lang = "en-GB";
-        recognition.interimResults = false;
+        recognition.interimResults = true; // Show real-time results
+        recognition.continuous = true; // Keep listening until stopped
         recognition.maxAlternatives = 1;
+
+
+        recognition.onsoundstart = () => {
+            // Some browsers fire this when any sound is detected
+            setIsSpeaking(true);
+        };
+        recognition.onsoundend = () => {
+            setIsSpeaking(false);
+        };
+        // Fallback or additional check using speechstart/end if soundstart isn't reliable
+        recognition.onspeechstart = () => setIsSpeaking(true);
+        recognition.onspeechend = () => setIsSpeaking(false);
 
         recognition.onstart = () => {
             setIsListening(true);
+            setIsSpeaking(false); // Reset
         };
 
         recognition.onend = () => {
-            setIsListening(false);
+            // If we stopped naturally but user didn't click actions, maybe we just stay 'not listening' 
+            // but we usually want to keep overlay if there is text? 
+            // accurate logic: if we confirmed/canceled, 'isListening' is set false there.
+            // if it stops on its own (silence), we might want to update UI state, 
+            // but for 'continuous', it tries to keep going.
+            // We'll trust manual controls to set isListening(false).
+            // But if it crashes/stops, we should probably sync state.
+            // Let's just track it loosely.
         };
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            setIsListening(false);
+            // setIsListening(false); // Don't auto-hide on minor errors, let user cancel
         };
 
         recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript?.trim();
-            if (!transcript) return;
+            let finalTranscript = "";
+            let interimTranscript = "";
 
-            setLastInputWasVoice(true);
-            setConversationMode(true);
-            setInput("");
-            sendToServer(transcript, true);
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
 
+            // Combine previous transcript + new final + interim
+            // Actually 'continuous' might append? 
+            // The simplest way with continuous is to just grab the latest 'final' or accumulate.
+            // For now, let's just grab everything.
 
+            // Better approach for simple input:
+            const currentText = Array.from(event.results)
+                .map(result => result[0].transcript)
+                .join('');
+
+            setVoiceTranscript(currentText);
+            // setInput(currentText); // Don't show in text field while recording, as per requests
         };
 
         recognitionRef.current = recognition;
@@ -291,10 +349,11 @@ export default function ChatScreenMui() {
             const resp = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include", // Ensure session cookies are sent
 
                 body: JSON.stringify({
                     message: text,
-                    sessionId, // 🔥 THIS WAS MISSING
+                    sessionId,
                 }),
 
 
@@ -322,10 +381,29 @@ export default function ChatScreenMui() {
             const reply =
                 data?.answer || data?.message || "Sorry, something went wrong.";
 
-            setMessages((m) => [
-                ...m,
-                { id: Date.now() + 1, from: "bot", text: reply },
-            ]);
+            // --- Letter-by-letter Typing Effect ---
+            const botMsgId = Date.now() + 1;
+            setMessages((prev) => [...prev, { id: botMsgId, from: "bot", text: "" }]);
+
+            let i = 0;
+            const typingInterval = setInterval(() => {
+                if (i < reply.length) {
+                    const nextChar = reply.charAt(i);
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === botMsgId ? { ...msg, text: msg.text + nextChar } : msg
+                        )
+                    );
+                    i++;
+                } else {
+                    clearInterval(typingInterval);
+                }
+            }, 15); // Adjust speed here
+
+            // Check for guest limit flag
+            if (data?.disableInput) {
+                setInputDisabled(true);
+            }
 
             if (data?.audio && isVoiceInput) {
                 playBotVoice(data.audio);
@@ -350,92 +428,225 @@ export default function ChatScreenMui() {
     }
 
     async function startNewChat() {
-        try {
-            await sendChatSummary();
-        } catch { }
+        // 🔥 Capture current state for background saving
+        const currentMessages = [...messages];
+        const currentSessionId = sessionStorage.getItem("flora_session_id");
 
+        // 🔥 OPTIMISTIC UI: Clear screen immediately
         sessionStorage.removeItem("flora_session_id");
-
         setMessages([]);
         setActiveConversationId(null);
         setConversationMode(false);
+        setInputDisabled(false);
+
+        // 🔥 Save history in background (don't await here for instant feel)
+        if (user && currentMessages.length > 0 && currentSessionId) {
+            sendChatSummary(currentMessages, currentSessionId)
+                .then(() => {
+                    // Refresh history after background save completes
+                    fetch(`${API_BASE}/conversations`, { credentials: "include" })
+                        .then(res => res.ok && res.json())
+                        .then(data => { if (Array.isArray(data)) setConversations(data) })
+                        .catch(console.error);
+                })
+                .catch(err => console.warn("Background summary failed", err));
+        }
     }
 
-    function VoiceWaveformOverlay() {
+    function VoiceWaveformOverlay({ onConfirm, onCancel, isSpeaking }) {
+        const [modulation, setModulation] = useState(Array(24).fill(1));
+
+        useEffect(() => {
+            if (!isSpeaking) {
+                setModulation(Array(24).fill(1));
+                return;
+            }
+
+            const interval = setInterval(() => {
+                setModulation(prev => prev.map(() => 0.5 + Math.random() * 1.5));
+            }, 100);
+
+            return () => clearInterval(interval);
+        }, [isSpeaking]);
+
         return (
             <Box
                 sx={{
                     position: "absolute",
                     inset: 0,
+                    borderRadius: "28px",
                     display: "flex",
                     alignItems: "center",
-                    pointerEvents: "none",
-                    px: 2.5,
+                    justifyContent: "space-between",
+                    px: 1,
+                    background: "#DBC094", // MATCH INPUT BG
+                    zIndex: 10,
                 }}
             >
-            
-                <Box
-                    sx={{
-                        position: "absolute",
-                        left: 20,
-                        right: 20,
-                        height: 2,
-                        background:
-                            "repeating-linear-gradient(to right, rgba(255,255,255,0.6) 0 4px, transparent 4px 8px)",
-                        opacity: 0.6,
-                    }}
-                />
+                {/* Center Waveform Area */}
+                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center" }}>
+                    {/* Dotted Line - Always there */}
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            height: 2,
+                            background: "radial-gradient(circle, rgba(255, 255, 255, 0.4) 1px, transparent 1px)",
+                            backgroundSize: "6px 2px",
+                            backgroundRepeat: "repeat-x",
+                            opacity: 0.6,
+                            maskImage: "linear-gradient(to right, transparent, black 10%, black 90%, transparent)",
+                            animation: !isSpeaking ? "marquee 3s linear infinite" : "none",
+                        }}
+                    />
 
-                {/* waveform */}
-                <Box
-                    sx={{
-                        display: "flex",
-                        gap: "3px",
-                        alignItems: "center",
-                        marginLeft: 60,
-                    }}
-                >
-                    {[...Array(22)].map((_, i) => (
+
+                    {isSpeaking && (
                         <Box
-                            key={i}
                             sx={{
-                                width: 3,
-                                height: `${Math.random() * 22 + 6}px`,
-                                borderRadius: 2,
-                                backgroundColor: "#fff",
-                                opacity: 0.9,
-                                animation: "wavePulse 1.2s infinite ease-in-out",
-                                animationDelay: `${i * 0.05}s`,
+                                display: "flex",
+                                gap: "2px",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "100%",
+                                zIndex: 1,
                             }}
-                        />
-                    ))}
+                        >
+                            {[...Array(24)].map((_, i) => (
+                                <Box
+                                    key={i}
+                                    sx={{
+                                        width: 2,
+                                        height: `${8 * (modulation[i] || 1)}px`,
+                                        borderRadius: 2,
+                                        backgroundColor: "#ffffff",
+                                        transition: "height 0.1s ease-in-out",
+                                        animation: "wavePulse 1.2s infinite ease-in-out",
+                                        animationDelay: `${(23 - i) * 0.05}s`, // Move from right to left (originating from icons)
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    )}
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 0.5 }}>
+                    <IconButton
+                        onClick={onCancel}
+                        size="small"
+                        sx={{
+                            color: "#fff",
+                            bgcolor: "rgba(0,0,0,0.15)",
+                            width: 36,
+                            height: 36,
+                            "&:hover": { bgcolor: "rgba(0,0,0,0.3)" }
+                        }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+
+                    <IconButton
+                        onClick={onConfirm}
+                        size="small"
+                        sx={{
+                            bgcolor: "rgba(80, 57, 32, 0.6)",
+
+                            color: "#fff",
+                            width: 32,
+                            height: 32,
+                            "&:hover": { bgcolor: "rgba(153, 86, 15, 0.6)" }
+                        }}
+                    >
+                        <CheckIcon fontSize="small" />
+                    </IconButton>
                 </Box>
 
                 <style>{`
         @keyframes wavePulse {
           0%, 100% {
-            transform: scaleY(0.4);
-            opacity: 0.4;
+            opacity: 0.5;
           }
           50% {
-            transform: scaleY(1.2);
             opacity: 1;
           }
         }
+        @keyframes marquee {
+            0% { background-position: 0 0; }
+            100% { background-position: 24px 0; }
+        }
       `}</style>
-            </Box>
+            </Box >
         );
     }
     function openConversation(conversation) {
+        // 🔥 Capture current state for background saving
+        const currentMessages = [...messages];
+        const currentSessionId = sessionStorage.getItem("flora_session_id");
+
+        // 🔥 Save current chat in background before switching (if not just opening same one)
+        if (user && currentMessages.length > 0 && currentSessionId && activeConversationId !== conversation._id) {
+            sendChatSummary(currentMessages, currentSessionId)
+                .then(() => {
+                    // Refresh history list so newly saved title appears
+                    fetch(`${API_BASE}/conversations`, { credentials: "include" })
+                        .then(res => res.ok && res.json())
+                        .then(data => { if (Array.isArray(data)) setConversations(data) })
+                        .catch(console.error);
+                })
+                .catch(err => console.warn("Background summary failed", err));
+        }
+
+        if (inputDisabled && activeConversationId !== conversation._id) {
+            setInputDisabled(false);
+        }
+
         setActiveConversationId(conversation._id);
         setConversationMode(true);
 
-        fetch(`${API_BASE}/conversations/${conversation._id}`)
+        fetch(`${API_BASE}/conversations/${conversation._id}`, { credentials: "include" })
             .then((res) => res.json())
             .then((data) => {
-                setMessages(Array.isArray(data.messages) ? data.messages : []);
+                // Resume session if sessionId exists
+                if (data.sessionId) {
+                    sessionStorage.setItem("flora_session_id", data.sessionId);
+                }
+
+                setMessages(Array.isArray(data.messages) ? data.messages.map((m, i) => ({
+                    id: i,
+                    from: m.role === 'user' ? 'user' : 'bot',
+                    text: m.content
+                })) : []);
             })
             .catch(console.error);
+    }
+
+    function deleteConversation(e, id) {
+        e.stopPropagation();
+        setIdToDelete(id);
+        setDeleteDialogOpen(true);
+    }
+
+    async function handleConfirmDelete() {
+        if (!idToDelete) return;
+        try {
+            const res = await fetch(`${API_BASE}/conversations/${idToDelete}`, {
+                method: "DELETE",
+                credentials: "include"
+            });
+
+            if (res.ok) {
+                setConversations(prev => prev.filter(c => c._id !== idToDelete));
+                if (activeConversationId === idToDelete) {
+                    startNewChat();
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setDeleteDialogOpen(false);
+            setIdToDelete(null);
+        }
     }
 
 
@@ -458,24 +669,26 @@ export default function ChatScreenMui() {
         }
     }
 
-    async function sendChatSummary() {
+    async function sendChatSummary(overrideMessages = null, overrideSessionId = null) {
         try {
-            if (!user || !messages.length) return;
+            const msgsToSave = overrideMessages || messages;
+            const sidToSave = overrideSessionId || sessionStorage.getItem("flora_session_id");
 
-            const sessionId = sessionStorage.getItem("flora_session_id");
-            if (!sessionId) return;
+            if (!user || !msgsToSave.length || !sidToSave) return;
 
             await fetch(`${API_BASE}/chat/summary`, {
                 method: "POST",
                 credentials: "include",
+                keepalive: true,
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    sessionId,
-                    messages, // 🔥 SEND FULL CHAT
+                    sessionId: sidToSave,
+                    messages: msgsToSave.map(m => ({
+                        role: m.from === 'user' ? 'user' : 'assistant',
+                        content: m.text
+                    })),
                 }),
             });
-
-            sessionStorage.removeItem("flora_session_id");
         } catch (err) {
             console.warn("Summary send failed", err);
         }
@@ -491,6 +704,8 @@ export default function ChatScreenMui() {
             audioRef.current.pause();
             audioRef.current = null;
         }
+
+        if (inputDisabled) return;
 
         const trimmed = input.trim();
         if (!trimmed) return;
@@ -521,15 +736,22 @@ export default function ChatScreenMui() {
         localStorage.removeItem("flora_user");
         sessionStorage.removeItem("flora_session_id");
 
+        try {
+            await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
+        } catch (e) { }
+
         setUser(null);
         setMessages([]);
         setConversationMode(false);
         setActiveConversationId(null);
+        setInputDisabled(false);
         handleSignupClose();
     }
 
     function handleMicClick() {
         const recognition = recognitionRef.current;
+
+        if (inputDisabled) return;
 
         if (!recognition) {
             alert("Speech recognition is not supported in this browser.");
@@ -538,12 +760,39 @@ export default function ChatScreenMui() {
 
         try {
             if (isListening) {
-                recognition.stop();
+                // If clicked again while listening, treat as cancel or maybe just stop?
+                // User asked for specific cross icon to cancel.
+                // Let's make mic click just toggle off (cancel) for safety, or do nothing?
+                // Standard behavior: toggle off.
+                handleCancelVoice();
             } else {
+                setVoiceTranscript("");
                 recognition.start();
             }
         } catch (err) {
             console.error("Error starting/stopping speech recognition:", err);
+        }
+    }
+
+    function handleCancelVoice() {
+        const recognition = recognitionRef.current;
+        if (recognition) recognition.stop();
+        setIsListening(false);
+        setVoiceTranscript("");
+        setInput(""); // Clear any partial input
+    }
+
+    function handleConfirmVoice() {
+        const recognition = recognitionRef.current;
+        if (recognition) recognition.stop();
+        setIsListening(false);
+
+        if (voiceTranscript.trim()) {
+            setLastInputWasVoice(true);
+            setConversationMode(true);
+            sendToServer(voiceTranscript, true); // true = isVoice
+            setInput("");
+            setVoiceTranscript("");
         }
     }
 
@@ -562,7 +811,296 @@ export default function ChatScreenMui() {
         "I am bored",
     ];
 
-    const sidebarWidth = collapsed ? 159 : 270;
+    const sidebarWidth = 270;
+
+    const renderSidebarContent = (isDesktop = true) => (
+        <Box sx={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+            height: "100%",
+            overflowY: "auto",
+            scrollbarWidth: 'none',
+            "&::-webkit-scrollbar": { display: "none" }
+        }}>
+            {!isDesktop && (
+                <Box sx={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 1
+                }}>
+                    <img src={flowerLogo} alt="logo" style={{ width: 42, height: "auto" }} />
+                    <IconButton onClick={() => setMobileOpen(false)} sx={{ color: "#EDDBBF" }}>
+                        <CloseIcon />
+                    </IconButton>
+                </Box>
+            )}
+
+            {isDesktop && (
+                <>
+                    <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 52, height: "auto", transition: "width 0.3s" }} />
+
+                    <IconButton
+                        onClick={() => setCollapsed(!collapsed)}
+                        sx={{
+                            bgcolor: "#F7EEDB",
+                            color: SIDEBAR_BG,
+                            width: 44,
+                            height: 44,
+                            "&:hover": { bgcolor: "#F3E5CB" },
+                            transition: "all 0.3s"
+                        }}
+                    >
+                        {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+                    </IconButton>
+                </>
+            )}
+
+            <Box
+                sx={{
+                    mt: isDesktop ? 1 : 0,
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1.5,
+                }}
+            >
+                {/* Explicit New Chat Button - Only for logged in users */}
+                {user && (
+                    <Tooltip title={(isDesktop && collapsed) ? "New Chat" : ""} placement="right">
+                        <Box
+                            onClick={() => {
+                                startNewChat();
+                                if (!isDesktop) setMobileOpen(false);
+                            }}
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                px: (isDesktop && collapsed) ? 0 : 1,
+                                justifyContent: (isDesktop && collapsed) ? "center" : "flex-start",
+                                cursor: "pointer",
+                            }}
+                        >
+                            <IconButton
+                                sx={{
+                                    color: "#EDDBBF",
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 2,
+                                    justifyContent: "center",
+                                    bgcolor: "rgba(255,255,255,0.08)",
+                                    border: "1px solid rgba(255,255,255,0.1)",
+                                    "&:hover": {
+                                        background: "rgba(255,255,255,0.2)",
+                                    },
+                                }}
+                            >
+                                <AddIcon />
+                            </IconButton>
+                            {(!isDesktop || !collapsed) && (
+                                <Typography
+                                    sx={{
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        ml: 1,
+                                        color: "rgba(255,255,255,0.95)",
+                                    }}
+                                >
+                                    New Chat
+                                </Typography>
+                            )}
+                        </Box>
+                    </Tooltip>
+                )}
+
+                {/* Menu Items */}
+                {menuItems.map(({ icon, label }) => (
+                    <Tooltip key={label} title={(isDesktop && collapsed) ? label : ""} placement="right">
+                        <Box
+                            onClick={() => {
+                                if (label === "Chat with Flora") startNewChat();
+                                if (!isDesktop) setMobileOpen(false);
+                            }}
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                px: (isDesktop && collapsed) ? 0 : 1,
+                                justifyContent: (isDesktop && collapsed) ? "center" : "flex-start",
+                                cursor: "pointer",
+                            }}
+                        >
+                            <IconButton
+                                sx={{
+                                    color: "#EDDBBF",
+                                    width: 44,
+                                    height: 44,
+                                    borderRadius: 2,
+                                    justifyContent: "center",
+                                    "&:hover": {
+                                        background: "rgba(255,255,255,0.1)",
+                                    },
+                                }}
+                            >
+                                <img
+                                    src={icon}
+                                    alt={label}
+                                    style={{
+                                        width: 22,
+                                        height: 22,
+                                        objectFit: "contain",
+                                        filter: "brightness(0) invert(1)",
+                                    }}
+                                />
+                            </IconButton>
+                            {(!isDesktop || !collapsed) && (
+                                <Typography
+                                    sx={{
+                                        fontSize: 13,
+                                        fontWeight: 500,
+                                        ml: 1,
+                                        color: "rgba(255,255,255,0.95)",
+                                    }}
+                                >
+                                    {label}
+                                </Typography>
+                            )}
+                        </Box>
+                    </Tooltip>
+                ))}
+
+                {/* History List */}
+                {user && conversations.length > 0 && (
+                    <Box sx={{
+                        width: '100%',
+                        mt: 2,
+                        borderTop: '1px solid rgba(255,255,255,0.1)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: (isDesktop && collapsed) ? 'center' : 'flex-start',
+                        maxHeight: '400px',
+                        overflowY: 'auto',
+                        scrollbarWidth: 'none',
+                        "&::-webkit-scrollbar": { display: "none" },
+                        position: 'relative'
+                    }}>
+                        <Box
+                            sx={{
+                                position: 'sticky',
+                                top: 0,
+                                bgcolor: SIDEBAR_BG,
+                                zIndex: 10,
+                                py: 1,
+                                width: '100%',
+                                pl: (isDesktop && collapsed) ? 0 : 3,
+                                mb: 1,
+                                textAlign: (isDesktop && collapsed) ? 'center' : 'left'
+                            }}
+                        >
+                            <Typography sx={{
+                                fontSize: 11,
+                                color: 'rgba(255,255,255,0.5)',
+                                textTransform: 'uppercase',
+                                letterSpacing: 1,
+                            }}>
+                                History
+                            </Typography>
+                        </Box>
+
+                        {conversations.map((c) => (
+                            <Tooltip key={c._id} title={(isDesktop && collapsed) ? (c.title || "Conversation") : ""} placement="right">
+                                <Box
+                                    onClick={() => {
+                                        openConversation(c);
+                                        if (!isDesktop) setMobileOpen(false);
+                                    }}
+                                    sx={{
+                                        width: (isDesktop && collapsed) ? '85%' : '90%',
+                                        mx: 'auto',
+                                        mb: 1,
+                                        p: 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        borderRadius: 1.5,
+                                        cursor: "pointer",
+                                        background: activeConversationId === c._id ? "rgba(255,255,255,0.12)" : "transparent",
+                                        "&:hover": {
+                                            background: "rgba(255,255,255,0.08)",
+                                            "& .delete-btn": { opacity: 1 }
+                                        },
+                                        position: 'relative'
+                                    }}
+                                >
+                                    <Typography
+                                        sx={{
+                                            fontSize: 12,
+                                            color: "rgba(255,255,255,0.9)",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            maxWidth: '80%'
+                                        }}
+                                    >
+                                        {c.title || "Conversation"}
+                                    </Typography>
+
+                                    <IconButton
+                                        className="delete-btn"
+                                        size="small"
+                                        onClick={(e) => deleteConversation(e, c._id)}
+                                        sx={{
+                                            color: "rgba(255,255,255,0.4)",
+                                            opacity: 0,
+                                            transition: 'opacity 0.2s',
+                                            padding: 0.5,
+                                            "&:hover": { color: "#ff6b6b" }
+                                        }}
+                                    >
+                                        <DeleteIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                </Box>
+                            </Tooltip>
+                        ))}
+                    </Box>
+                )}
+            </Box>
+
+            <Box sx={{ flex: 1 }} />
+
+            <Box
+                sx={{
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    mb: 1,
+                }}
+            >
+                <Box
+                    sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "50%",
+                        bgcolor: ACCENT_LIGHT,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: ACCENT_DARK,
+                        fontWeight: 400,
+                        cursor: "pointer",
+                        boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+                    }}
+                >
+                    SOS
+                </Box>
+            </Box>
+        </Box>
+    );
 
     return (
         <Box
@@ -571,7 +1109,7 @@ export default function ChatScreenMui() {
                 minHeight: "100vh",
                 height: "100vh",
                 background: BG_GRADIENT,
-                marginLeft: isMobile ? 0 : 0,
+                marginLeft: 0,
                 fontFamily:
                     "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
                 overflowY: "auto",
@@ -580,150 +1118,30 @@ export default function ChatScreenMui() {
             <CssBaseline />
             <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
 
-            {isMobile && (
-                <>
-                    <IconButton
-                        onClick={() => setMobileDrawerOpen(true)}
-                        sx={{
-                            position: "fixed",
-                            top: 16,
-                            left: 16,
-                            zIndex: 2000,
-
-                            bgcolor: "#fff",
-                            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
-                        }}
-                    >
-                        <MenuIcon />
-                    </IconButton>
-
-                    <Box
-                        sx={{
-                            position: "fixed",
-                            top: 16,
-                            right: 16,
-                            zIndex: 2000,
-
-                        }}
-                    >
-                        {user ? (
-                            <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
-                                <Box
-                                    component="img"
-                                    src={user.avatar}
-                                    alt={user.name}
-                                    sx={{
-                                        width: 38,
-                                        height: 38,
-                                        borderRadius: "50%",
-                                        border: "2px solid #CAA361",
-                                        objectFit: "cover",
-
-                                    }}
-                                />
-                            </IconButton>
-                        ) : (
-                            <Button
-                                onClick={handleSignupClick}
-                                sx={{
-                                    color: ACCENT_DARK,
-                                    fontWeight: 500,
-                                    bgcolor: "rgba(255,255,255,0.9)",
-                                    px: 2,
-                                    borderRadius: 2,
-                                }}
-                            >
-                                Sign up
-                            </Button>
-                        )}
-                    </Box>
-                </>
-            )}
-
+            {/* Mobile Sidebar (Drawer) */}
             <Drawer
                 anchor="left"
-                open={mobileDrawerOpen}
-                onClose={() => setMobileDrawerOpen(false)}
-                PaperProps={{
-                    sx: {
-                        width: 260,
+                open={mobileOpen}
+                onClose={() => setMobileOpen(false)}
+                sx={{
+                    "& .MuiDrawer-paper": {
+                        width: sidebarWidth,
                         bgcolor: SIDEBAR_BG,
-                        color: "#fff",
-                        pt: 3,
+                        color: "#EDDBBF",
+                        p: 2,
+                        boxShadow: "none",
+                        backgroundImage: "none"
                     },
                 }}
             >
-                <Box sx={{ display: "flex", justifyContent: "center", mb: 3 }}>
-                    <img src={flowerLogo} alt="logo" style={{ width: 48 }} />
-                </Box>
-
-                {user && (
-                    <Box
-                        onClick={() => {
-                            startNewChat();
-
-                            setMobileDrawerOpen(false);
-                        }}
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                            px: 3,
-                            py: 1.5,
-                            cursor: "pointer",
-                            borderRadius: 2,
-                            mx: 2,
-                            mb: 1,
-                            background: "rgba(255,255,255,0.08)",
-                            "&:hover": {
-                                background: "rgba(255,255,255,0.14)",
-                            },
-                        }}
-                    >
-                        <AddIcon sx={{ fontSize: 22, color: "#EDDBBF" }} />
-                        <Typography sx={{ fontSize: 14, fontWeight: 600, color: "#fff" }}>
-                            New Chat
-                        </Typography>
-                    </Box>
-                )}
-
-
-                {menuItems.map(({ icon, label }, index) => (
-                    <Box
-                        key={label}
-                        onClick={() => {
-                            if (index === 0) startNewChat();
-                            ;
-                            setMobileDrawerOpen(false);
-                        }}
-                        sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                            px: 3,
-                            py: 1.5,
-                            cursor: "pointer",
-                            "&:hover": { background: "rgba(255,255,255,0.1)" },
-                        }}
-                    >
-                        <img
-                            src={icon}
-                            alt={label}
-                            style={{
-                                width: 22,
-                                height: 22,
-                                filter: "brightness(0) invert(1)",
-                            }}
-                        />
-                        <Typography sx={{ fontSize: 14 }}>{label}</Typography>
-                    </Box>
-                ))}
+                {renderSidebarContent(false)}
             </Drawer>
 
+            {/* Desktop Sidebar */}
             {!isMobile && (
                 <Box
                     sx={{
-                        width: sidebarWidth,
+                        width: collapsed ? 180 : sidebarWidth,
                         bgcolor: SIDEBAR_BG,
                         color: "#664B2E",
                         display: "flex",
@@ -738,275 +1156,128 @@ export default function ChatScreenMui() {
                         height: "100vh",
                         zIndex: 1300,
                         overflowY: "auto",
+                        transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                        scrollbarWidth: 'none',
+                        "&::-webkit-scrollbar": { display: "none" }
                     }}
                 >
-                    <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                    {renderSidebarContent(true)}
+                </Box>
+            )}
 
-                        <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 46, height: "auto" }} />
-                    </Box>
-
-                    <Box
-                        onClick={() => setCollapsed((s) => !s)}
-                        sx={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: "50%",
-                            mt: 2,
-                            mb: 2,
-                            background: "#866A4D",
-                            border: "1px solid #CAA361",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            transition: "all 250ms ease",
-                            boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
-                            "&:hover": {
-                                transform: "scale(1.05)",
-                                background: "#8b7358",
-                            },
-                        }}
-                    >
-                        <Box
+            {!isMobile && (
+                <Box
+                    sx={{
+                        position: "fixed",
+                        top: 16,
+                        right: 24,
+                        zIndex: 2000,
+                    }}
+                >
+                    {user ? (
+                        <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                            <Box
+                                component="img"
+                                src={user.avatar}
+                                alt={user.name}
+                                sx={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: "50%",
+                                    border: "2px solid #CAA361",
+                                    objectFit: "cover",
+                                }}
+                            />
+                        </IconButton>
+                    ) : (
+                        <Button
+                            onClick={handleSignupClick}
                             sx={{
-                                width: 32,
-                                height: 72,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                transition: "transform 250ms ease",
-                                transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
+                                color: ACCENT_DARK,
+                                fontWeight: 500,
                             }}
                         >
-                            <svg
-                                width="24"
-                                height="24"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                            >
-                                <path
-                                    d="M9 6L15 12L9 18"
-                                    stroke="white"
-                                    strokeWidth="1.3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                        </Box>
-                    </Box>
+                            Sign up
+                        </Button>
+                    )}
+                </Box>
+            )}
 
-                    <Box
-                        sx={{
-                            mt: 1,
-                            width: "100%",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 1.5,
-                        }}
-                    >
-
-                        {user && (
-                            <Box
-                                onClick={startNewChat}
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                    px: collapsed ? 0 : 1,
-                                    justifyContent: collapsed ? "center" : "flex-start",
-                                    cursor: "pointer",
-                                    mb: 1,
-                                }}
-                            >
-                                {conversations.map((c) => (
-                                    <Box
-                                        key={c._id}
-                                        onClick={() => openConversation(c)}
-                                        sx={{
-                                            px: collapsed ? 1 : 2,
-                                            py: 1,
-                                            mx: 1,
-                                            borderRadius: 1.5,
-                                            cursor: "pointer",
-                                            background:
-                                                activeConversationId === c._id
-                                                    ? "rgba(255,255,255,0.12)"
-                                                    : "transparent",
-                                            "&:hover": {
-                                                background: "rgba(255,255,255,0.1)",
-                                            },
-                                        }}
-                                    >
-                                        {!collapsed && (
-                                            <Typography
-                                                sx={{
-                                                    fontSize: 12,
-                                                    fontWeight: 500,
-                                                    color: "rgba(255,255,255,0.95)",
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                }}
-                                            >
-                                                {c.title || "New conversation"}
-                                            </Typography>
-                                        )}
-                                    </Box>
-                                ))}
-
-                                <IconButton
-                                    sx={{
-                                        color: "#EDDBBF",
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: 2,
-                                        justifyContent: "center",
-                                        border: "1px solid rgba(255,255,255,0.18)",
-                                        background: "rgba(255,255,255,0.06)",
-                                        "&:hover": {
-                                            background: "rgba(255,255,255,0.14)",
-                                        },
-                                    }}
-                                >
-                                    <AddIcon sx={{ fontSize: 22 }} />
-                                </IconButton>
-
-                                {!collapsed && (
-                                    <Typography
-                                        sx={{
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            ml: 1,
-                                            color: "rgba(255,255,255,0.95)",
-                                        }}
-                                    >
-                                        New Chat
-                                    </Typography>
-                                )}
-                            </Box>
-                        )}
-
-                        {menuItems.map(({ icon, label }, index) => (
-                            <Box
-                                key={label}
-                                onClick={index === 0 ? startNewChat : undefined}
-                                sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                    px: collapsed ? 0 : 1,
-                                    justifyContent: collapsed ? "center" : "flex-start",
-                                    cursor: index === 0 ? "pointer" : "default",
-                                }}
-                            >
-                                <IconButton
-                                    sx={{
-                                        color: "#EDDBBF",
-                                        width: 44,
-                                        height: 44,
-                                        borderRadius: 2,
-                                        justifyContent: "center",
-                                        "&:hover": {
-                                            background: "rgba(255,255,255,0.1)",
-                                        },
-                                    }}
-                                >
-                                    <img
-                                        src={icon}
-                                        alt={label}
-                                        style={{
-                                            width: 22,
-                                            height: 22,
-                                            objectFit: "contain",
-                                            filter: "brightness(0) invert(1)",
-                                        }}
-                                    />
-                                </IconButton>
-                                {!collapsed && (
-                                    <Typography
-                                        sx={{
-                                            fontSize: 13,
-                                            fontWeight: 500,
-                                            ml: 1,
-                                            color: "rgba(255,255,255,0.95)",
-                                        }}
-                                    >
-                                        {label}
-                                    </Typography>
-                                )}
-                            </Box>
-                        ))}
-                    </Box>
+            {/* Mobile Top Navigation */}
+            {isMobile && (
+                <Box
+                    sx={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 72,
+                        bgcolor: "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        px: 3,
+                        py: 2,
+                        zIndex: 1200,
+                    }}
+                >
+                    <IconButton onClick={() => setMobileOpen(true)} sx={{ color: SIDEBAR_BG }}>
+                        <MenuIcon />
+                    </IconButton>
 
                     <Box sx={{ flex: 1 }} />
 
-                    <Box
-                        sx={{
-                            position: "fixed",
-                            top: 16,
-                            right: 24,
-                            zIndex: 2000,
-                        }}
-                    >
-                        {user ? (
-                            <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
-                                <Box
-                                    component="img"
-                                    src={user.avatar}
-                                    alt={user.name}
-                                    sx={{
-                                        width: 38,
-                                        height: 38,
-                                        borderRadius: "50%",
-                                        border: "2px solid #CAA361",
-                                        objectFit: "cover",
-                                    }}
-                                />
-                            </IconButton>
-                        ) : (
-                            <Button
-                                onClick={handleSignupClick}
+                    {user ? (
+                        <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                            <Box
+                                component="img"
+                                src={user.avatar}
+                                alt={user.name}
                                 sx={{
-                                    color: ACCENT_DARK,
-                                    fontWeight: 500,
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "50%",
+                                    border: "2px solid #CAA361",
+                                    objectFit: "cover",
                                 }}
-                            >
-                                Sign up
-                            </Button>
-                        )}
-
-
-                    </Box>
-
-                    <Box
-                        sx={{
-                            width: "100%",
-                            display: "flex",
-                            justifyContent: "center",
-                            mb: 1,
-                        }}
-                    >
-                        <Box
+                            />
+                        </IconButton>
+                    ) : (
+                        <Button
+                            onClick={handleSignupClick}
                             sx={{
-                                width: 48,
-                                height: 48,
-                                borderRadius: "50%",
-                                bgcolor: ACCENT_LIGHT,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
                                 color: ACCENT_DARK,
-                                fontWeight: 400,
-                                cursor: "pointer",
-                                boxShadow: "0 6px 18px rgba(0,0,0,0.2)",
+                                fontWeight: 600,
+                                fontSize: 13,
+                                textTransform: "none",
                             }}
                         >
-                            SOS
-                        </Box>
-                    </Box>
+                            Sign up
+                        </Button>
+                    )}
                 </Box>
             )}
+
+            {/* Login Overlay / Disabler */}
+            {inputDisabled && !user && (
+                <Box sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 9999,
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}>
+                </Box>
+            )}
+
+
+
+
+
 
             <Menu
                 anchorEl={signupAnchorEl}
@@ -1142,30 +1413,38 @@ export default function ChatScreenMui() {
             <Box
                 sx={{
                     flex: 1,
-                    marginLeft: isMobile ? 0 : `${sidebarWidth}px`,
+                    marginLeft: isMobile ? 0 : (collapsed ? "100px" : `${sidebarWidth}px`),
                     height: "100vh",
                     overflowY: "auto",
                     overflowX: "hidden",
-                    transition: "margin-left 250ms ease",
+                    transition: "margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                    pt: isMobile ? "72px" : 0, // Padding for mobile header
+                    // Masking to fade chats behind the transparent top nav
+                    ...(isMobile && {
+                        maskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
+                        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
+                    })
                 }}
             >
                 <Container
                     maxWidth="lg"
                     sx={{
-                        minHeight: "100%",
+                        flex: 1,
                         display: "flex",
                         flexDirection: "column",
                         px: isMobile ? 2 : 3,
-
+                        minHeight: "100%",
+                        position: "relative",
                     }}
                 >
                     <Box
                         sx={{
                             display: conversationMode ? "none" : "flex",
+                            flex: 1,
                             flexDirection: "column",
                             alignItems: "center",
-                            pt: { xs: 10, md: 10 },
-
+                            justifyContent: "center",
+                            pt: conversationMode ? 0 : { xs: 0, md: 10 },
                             transition: "opacity 320ms ease, transform 320ms ease",
                             opacity: conversationMode ? 0 : 1,
                             transform: conversationMode
@@ -1173,22 +1452,18 @@ export default function ChatScreenMui() {
                                 : "none",
                         }}
                     >
-                        {!isMobile && (
-                            <InteractiveSvgAvatar
-                                maxOffsetPx={3}
-                                style={{
-                                    width: 160,
-                                    height: 160,
-                                    marginTop: 24,
-                                    marginBottom: 12,
-                                }}
-                            />
-                        )}
+                        <InteractiveSvgAvatar
+                            maxOffsetPx={3}
+                            style={{
+                                width: isMobile ? 120 : 160,
+                                height: isMobile ? 120 : 160,
+                                marginTop: 24,
+                                marginBottom: 12,
+                            }}
+                        />
 
                         {isMobile ? (
                             <>
-                                <Box sx={{ height: 100 }} />
-
                                 <Typography
                                     variant="h6"
                                     align="center"
@@ -1200,7 +1475,7 @@ export default function ChatScreenMui() {
                                         px: 2,
                                     }}
                                 >
-                                    I'm Luna,
+                                    Welcome to Luna
                                 </Typography>
 
                                 <Typography
@@ -1212,97 +1487,7 @@ export default function ChatScreenMui() {
                                         fontSize: "1.05rem",
                                     }}
                                 >
-                                    your AI Mental Health Companion
-                                </Typography>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        textAlign: "center",
-                                        fontStyle: "italic",
-                                        mb: 2,
-                                        color: "#4E351A",
-                                        fontFamily: "Poppins",
-                                        fontSize: 14,
-                                        mt: 20,
-                                    }}
-                                >
-                                    What people talk about most.
-                                </Typography>
-
-
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        gap: 2,
-                                        justifyContent: "center",
-                                        mt: 1,
-                                    }}
-                                >
-                                    {quickTopics.slice(0, 3).map((t) => (
-                                        <Chip
-                                            key={t}
-                                            label={t}
-                                            onClick={() => setInput(t)}
-                                            variant="outlined"
-                                            sx={{
-                                                borderRadius: 99,
-                                                borderColor: "#9E7F49",
-                                                background: "transparent",
-                                                color: "rgba(80, 57, 32, 0.6)",
-                                                px: 0,
-                                                minWidth: 100,
-                                                "& .MuiChip-label": {
-                                                    py: 0.7,
-                                                    fontSize: 12,
-                                                    fontFamily: "Poppins",
-                                                },
-                                            }}
-                                        />
-                                    ))}
-                                </Box>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        gap: 2,
-                                        justifyContent: "center",
-                                        mt: 2,
-                                    }}
-                                >
-                                    {quickTopics.slice(3, 5).map((t) => (
-                                        <Chip
-                                            key={t}
-                                            label={t}
-                                            onClick={() => setInput(t)}
-                                            variant="outlined"
-                                            sx={{
-                                                borderRadius: 99,
-                                                borderColor: "#9E7F49",
-                                                background: "transparent",
-                                                color: "rgba(80, 57, 32, 0.6)",
-                                                px: 0,
-                                                minWidth: 100,
-                                                "& .MuiChip-label": {
-                                                    py: 0.7,
-                                                    fontSize: 12,
-                                                    fontFamily: "Poppins",
-                                                },
-                                            }}
-                                        />
-                                    ))}
-                                </Box>
-                                <Box sx={{ height: 100 }} />
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        mb: 1,
-                                        textAlign: "center",
-                                        color: "#826840",
-                                        fontSize: 14,
-                                        fontWeight: 100,
-                                    }}
-                                >
-                                    Disclaimer: Flora offers support, not medical care.<br />
-                                    Always consult a professional.
+                                    Your Reflective AI Wellness Companion
                                 </Typography>
                             </>
                         ) : (
@@ -1318,9 +1503,9 @@ export default function ChatScreenMui() {
                                     px: 2,
                                 }}
                             >
-                                I'm Luna,{" "}
+                                Welcome to Luna{" "}
                                 <Box component="span" sx={{ fontWeight: 400 }}>
-                                    your AI Mental Health Companion
+                                    — Your Reflective AI Wellness Companion
                                 </Box>
                             </Typography>
                         )}
@@ -1351,6 +1536,7 @@ export default function ChatScreenMui() {
                                 display: "flex",
                                 justifyContent: "center",
                                 mb: 4,
+                                mt: { xs: 8, md: 0 },
                             }}
                         >
                             <Box
@@ -1391,6 +1577,10 @@ export default function ChatScreenMui() {
                                                     fontSize: 16,
                                                     color: ACCENT_DARK,
                                                 },
+                                                "& .MuiInputBase-input.Mui-disabled": {
+                                                    opacity: 1,
+                                                    "-webkit-text-fill-color": ACCENT_DARK,
+                                                },
                                                 "& .MuiInputBase-input::placeholder":
                                                 {
                                                     color: "#8F7E63",
@@ -1398,10 +1588,12 @@ export default function ChatScreenMui() {
                                                 },
                                             },
                                         }}
-                                        disabled={sending || isListening}
+                                        disabled={sending || isListening || inputDisabled}
                                     />
 
-                                    {isListening && <VoiceWaveformOverlay />}
+
+
+                                    {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
 
 
 
@@ -1600,6 +1792,26 @@ export default function ChatScreenMui() {
 
                     </Box>
 
+                    {isMobile && !conversationMode && (
+                        <Box sx={{ mt: "auto", pb: 3, width: "100%" }}>
+                            <Typography
+                                variant="caption"
+                                align="center"
+                                sx={{
+                                    color: "rgba(80, 57, 32, 0.5)",
+                                    px: 4,
+                                    fontSize: 14,
+                                    fontWeight: 100,
+                                    display: "block",
+                                    textAlign: "center"
+                                }}
+                            >
+                                Disclaimer: Flora offers support, not medical care.<br />
+                                Always consult a professional.
+                            </Typography>
+                        </Box>
+                    )}
+
                     {/* Conversation view */}
                     {conversationMode && (
                         <Box
@@ -1707,6 +1919,7 @@ export default function ChatScreenMui() {
                                         </Box>
                                     ))}
 
+
                                     {sending && (
                                         <Box
                                             sx={{
@@ -1757,7 +1970,8 @@ export default function ChatScreenMui() {
                                     py: 2,
                                     position: "sticky",
                                     bottom: 0,
-                                    bgcolor: BG_GRADIENT,
+                                    background: BG_GRADIENT,
+                                    backgroundAttachment: "fixed",
                                     zIndex: 100,
                                 }}
                             >
@@ -1865,6 +2079,8 @@ export default function ChatScreenMui() {
                                                     />
                                                 </Box>
                                             </IconButton>
+
+                                            {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
                                         </Box>
 
                                         <Box
@@ -1916,6 +2132,47 @@ export default function ChatScreenMui() {
                     )}
                 </Container>
             </Box>
-        </Box>
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: "20px",
+                        bgcolor: PAPER_BG,
+                        p: 1
+                    }
+                }}
+            >
+                <DialogTitle sx={{ color: ACCENT_DARK, fontWeight: 700 }}>
+                    Delete History?
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: "rgba(43, 26, 17, 0.7)" }}>
+                        Are you sure you want to delete this chat history? This action cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button
+                        onClick={() => setDeleteDialogOpen(false)}
+                        sx={{ color: "rgba(43, 26, 17, 0.5)", textTransform: 'none' }}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleConfirmDelete}
+                        variant="contained"
+                        sx={{
+                            bgcolor: "#ff6b6b",
+                            color: "#fff",
+                            borderRadius: "10px",
+                            textTransform: 'none',
+                            "&:hover": { bgcolor: "#ff5252" }
+                        }}
+                    >
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box >
     );
 }
