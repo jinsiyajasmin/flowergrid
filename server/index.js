@@ -26,7 +26,7 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
-  'https://flowergrid.vercel.app/',
+  'https://flowergrid.vercel.app',
   'https://api.luna.flowergrid.co.uk'
 ];
 
@@ -34,7 +34,7 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:4000',
-    'https://flowergrid.vercel.app/',
+    'https://flowergrid.vercel.app',
     'https://api.luna.flowergrid.co.uk'
   ],
   credentials: true
