@@ -166,7 +166,7 @@ export default function ChatScreenMui() {
     ];
 
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.luna.flowergrid.co.uk";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://flowergrid-7mw2.vercel.app/";
 
     useEffect(() => {
         try {
