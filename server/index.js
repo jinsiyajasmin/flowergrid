@@ -175,6 +175,34 @@ app.get(
 );
 
 
+// Stateless authentication middleware for Vercel
+async function authenticateUser(req, res, next) {
+  try {
+    const userId = req.headers['x-user-id'];
+
+    if (!userId) {
+      // Check if session-based auth worked (for local development)
+      if (req.user) {
+        return next();
+      }
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Validate user exists in database
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid user' });
+    }
+
+    // Attach user to request
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('Auth error:', err);
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+}
+
 function isUserLoggedIn(req) {
   return !!req.user;
 }
@@ -615,7 +643,7 @@ app.get("/admin/summaries", async (req, res) => {
   }
 });
 
-app.get("/conversations", async (req, res) => {
+app.get("/conversations", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -639,7 +667,7 @@ app.get("/conversations", async (req, res) => {
   }
 });
 
-app.get("/conversations/:id", async (req, res) => {
+app.get("/conversations/:id", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -661,7 +689,7 @@ app.get("/conversations/:id", async (req, res) => {
   }
 });
 
-app.delete("/conversations/:id", async (req, res) => {
+app.delete("/conversations/:id", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -686,7 +714,7 @@ app.delete("/conversations/:id", async (req, res) => {
 
 
 
-app.post("/chat/summary", async (req, res) => {
+app.post("/chat/summary", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });

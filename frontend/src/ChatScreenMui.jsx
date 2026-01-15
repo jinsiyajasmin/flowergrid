@@ -194,7 +194,10 @@ export default function ChatScreenMui() {
         if (!user) return;
 
         fetch(`${API_BASE}/conversations`, {
-            credentials: "include"
+            credentials: "include",
+            headers: {
+                'x-user-id': user.id
+            }
         })
             .then((res) => {
                 if (res.status === 401) return [];
@@ -444,7 +447,10 @@ export default function ChatScreenMui() {
             sendChatSummary(currentMessages, currentSessionId)
                 .then(() => {
                     // Refresh history after background save completes
-                    fetch(`${API_BASE}/conversations`, { credentials: "include" })
+                    fetch(`${API_BASE}/conversations`, {
+                        credentials: "include",
+                        headers: { 'x-user-id': user.id }
+                    })
                         .then(res => res.ok && res.json())
                         .then(data => { if (Array.isArray(data)) setConversations(data) })
                         .catch(console.error);
@@ -589,7 +595,10 @@ export default function ChatScreenMui() {
             sendChatSummary(currentMessages, currentSessionId)
                 .then(() => {
                     // Refresh history list so newly saved title appears
-                    fetch(`${API_BASE}/conversations`, { credentials: "include" })
+                    fetch(`${API_BASE}/conversations`, {
+                        credentials: "include",
+                        headers: { 'x-user-id': user.id }
+                    })
                         .then(res => res.ok && res.json())
                         .then(data => { if (Array.isArray(data)) setConversations(data) })
                         .catch(console.error);
@@ -604,7 +613,10 @@ export default function ChatScreenMui() {
         setActiveConversationId(conversation._id);
         setConversationMode(true);
 
-        fetch(`${API_BASE}/conversations/${conversation._id}`, { credentials: "include" })
+        fetch(`${API_BASE}/conversations/${conversation._id}`, {
+            credentials: "include",
+            headers: { 'x-user-id': user.id }
+        })
             .then((res) => res.json())
             .then((data) => {
                 // Resume session if sessionId exists
@@ -632,7 +644,8 @@ export default function ChatScreenMui() {
         try {
             const res = await fetch(`${API_BASE}/conversations/${idToDelete}`, {
                 method: "DELETE",
-                credentials: "include"
+                credentials: "include",
+                headers: { 'x-user-id': user.id }
             });
 
             if (res.ok) {
@@ -680,7 +693,10 @@ export default function ChatScreenMui() {
                 method: "POST",
                 credentials: "include",
                 keepalive: true,
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    'x-user-id': user.id
+                },
                 body: JSON.stringify({
                     sessionId: sidToSave,
                     messages: msgsToSave.map(m => ({
