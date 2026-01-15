@@ -146,7 +146,7 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user;
-    const frontendUrl = "http://localhost:5173";
+    const frontendUrl = "https://flowergrid.vercel.app";
 
 
     const userPayload = {
