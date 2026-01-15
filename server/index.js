@@ -26,7 +26,7 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
-  
+
   'https://api.luna.flowergrid.co.uk',
   'https://flowergrid.vercel.app'
 ];
@@ -144,7 +144,7 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user;
-    const frontendUrl = process.env.FRONTEND_URL || 'https://flowergrid.vercel.app';
+    const frontendUrl = "https://luna.flowergrid.co.uk";
 
 
     const userPayload = {
