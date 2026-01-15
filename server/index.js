@@ -26,7 +26,7 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
-
+  'https://luna.flowergrid.co.uk',
   'https://api.luna.flowergrid.co.uk',
   'https://flowergrid.vercel.app'
 ];
@@ -35,11 +35,13 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:4000',
-
+    'https://luna.flowergrid.co.uk',
     'https://api.luna.flowergrid.co.uk',
     'https://flowergrid.vercel.app'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.get('/health', (req, res) => res.json({ status: "alive" }));
@@ -144,7 +146,7 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user;
-    const frontendUrl = "https://luna.flowergrid.co.uk";
+    const frontendUrl = "http://localhost:5173";
 
 
     const userPayload = {
