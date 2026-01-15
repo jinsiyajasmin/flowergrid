@@ -277,7 +277,8 @@ async function buildIndex() {
   try {
     await fs.access(KB_DIR);
   } catch {
-    await fs.mkdir(KB_DIR, { recursive: true });
+    // KB directory doesn't exist - this is fine, just return with empty KB_TEXTS
+    console.warn('KB directory not found, continuing without knowledge base');
     return;
   }
   const files = (await fs.readdir(KB_DIR)).filter(f => /\.(txt|md)$/i.test(f));
