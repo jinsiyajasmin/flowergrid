@@ -30,7 +30,7 @@ import PeopleIcon from "../assets/none.png";
 
 
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://api.luna.flowergrid.co.uk";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);

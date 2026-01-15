@@ -27,7 +27,8 @@ const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk'
+  'https://api.luna.flowergrid.co.uk',
+  'https://flowergrid.vercel.app'
 ];
 
 app.use(cors({
@@ -35,10 +36,13 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:4000',
     'https://luna.flowergrid.co.uk',
-    'https://api.luna.flowergrid.co.uk'
+    'https://api.luna.flowergrid.co.uk',
+    'https://flowergrid.vercel.app'
   ],
   credentials: true
 }));
+
+app.get('/health', (req, res) => res.json({ status: "alive" }));
 
 app.use(express.json());
 
@@ -65,6 +69,25 @@ const openai = new OpenAI({
 });
 
 let KB_TEXTS = [];
+let isInitialized = false;
+
+async function initializeApp() {
+  if (isInitialized) return;
+  await connectDB();
+  await buildIndex();
+  isInitialized = true;
+}
+
+// Middleware to ensure DB and KB are ready
+app.use(async (req, res, next) => {
+  try {
+    await initializeApp();
+    next();
+  } catch (err) {
+    console.error("Initialization failed:", err);
+    res.status(500).send("Internal Server Error");
+  }
+});
 
 passport.use(
   new GoogleStrategy(
@@ -716,10 +739,10 @@ app.post("/chat/summary", async (req, res) => {
 
 
 
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`🌼 Luna is live at http://localhost:${PORT}`);
+  });
+}
 
-await connectDB();
-
-app.listen(PORT, async () => {
-  await buildIndex();
-  console.log(`🌼 Luna is live at ${PORT}`);
-});
+export default app;
