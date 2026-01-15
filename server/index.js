@@ -184,7 +184,7 @@ async function generateChatSummary(messages) {
     .join('\n');
 
   const resp = await openai.chat.completions.create({
-    model: process.env.CHAT_MODEL || 'gpt-4.1',
+    model: process.env.CHAT_MODEL || 'gpt-4o',
     messages: [
       {
         role: 'system',
@@ -489,7 +489,7 @@ async function chatWithFlora(history, userMessage, options = {}) {
   ];
 
   const resp = await openai.chat.completions.create({
-    model: process.env.CHAT_MODEL || 'gpt-4.1',
+    model: process.env.CHAT_MODEL || 'gpt-4o',
     messages: fullMessages,
     temperature: 0.3,
     max_completion_tokens: 220
