@@ -27,6 +27,7 @@ import AnimatedMenuIcon from "./AnimatedMenuIcon";
 import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
+import ScaleLetterText from "./components/ScaleLetterText";
 import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
@@ -1566,9 +1567,10 @@ export default function ChatScreenMui() {
                                         px: 2,
                                     }}
                                 >
-                                    <TypingAnimation duration={100} delay={!splashComplete}>
-                                        Welcome to Luna
-                                    </TypingAnimation>
+                                    <ScaleLetterText
+                                        text="Welcome to Luna"
+                                        delay={!splashComplete ? 0.5 : 0}
+                                    />
                                 </Typography>
 
                                 <Typography
