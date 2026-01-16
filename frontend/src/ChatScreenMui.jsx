@@ -1567,10 +1567,9 @@ export default function ChatScreenMui() {
                                         px: 2,
                                     }}
                                 >
-                                    <ScaleLetterText
-                                        text="Welcome to Luna"
-                                        delay={!splashComplete ? 0.5 : 0}
-                                    />
+                                    <TypingAnimation duration={100} delay={!splashComplete}>
+                                        Welcome to Luna
+                                    </TypingAnimation>
                                 </Typography>
 
                                 <Typography
@@ -1598,24 +1597,14 @@ export default function ChatScreenMui() {
                                     px: 2,
                                 }}
                             >
-                                {isMobile ? (
-                                    <>
-                                        <TypingAnimation duration={80} delay={!splashComplete}>
-                                            Welcome to Luna
-                                        </TypingAnimation>
-                                        {" "}
-                                        <Box component="span" sx={{ fontWeight: 400 }}>
-                                            - Your Reflective AI Wellness Companion
-                                        </Box>
-                                    </>
-                                ) : (
-                                    <>
-                                        Welcome to Luna{" "}
-                                        <Box component="span" sx={{ fontWeight: 400 }}>
-                                            - Your Reflective AI Wellness Companion
-                                        </Box>
-                                    </>
-                                )}
+                                <ScaleLetterText
+                                    text="Welcome to Luna"
+                                    delay={!splashComplete ? 0.5 : 0}
+                                />
+                                {" "}
+                                <Box component="span" sx={{ fontWeight: 400 }}>
+                                    - Your Reflective AI Wellness Companion
+                                </Box>
                             </Typography>
                         )}
 
