@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
     CssBaseline,
     Typography,
@@ -26,6 +27,7 @@ import AnimatedMenuIcon from "./AnimatedMenuIcon";
 import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
+import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
 import CheckIcon from '@mui/icons-material/Check';
@@ -124,6 +126,7 @@ export default function ChatScreenMui() {
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef(null);
+    const [splashComplete, setSplashComplete] = useState(false);
     const [signupAnchorEl, setSignupAnchorEl] = useState(null);
     const signupOpen = Boolean(signupAnchorEl);
     const [user, setUser] = useState(null);
@@ -268,7 +271,7 @@ export default function ChatScreenMui() {
         recognition.lang = "en-GB";
         recognition.interimResults = true; // Show real-time results
         recognition.continuous = true; // Keep listening until stopped
-        recognition.maxAlternatives = 1;
+        recognition.maxAlternatives = 3; // Get more alternatives for better accuracy
 
 
         recognition.onsoundstart = () => {
@@ -300,33 +303,56 @@ export default function ChatScreenMui() {
 
         recognition.onerror = (event) => {
             console.error("Speech recognition error:", event.error);
-            // setIsListening(false); // Don't auto-hide on minor errors, let user cancel
+
+            switch (event.error) {
+                case 'no-speech':
+                    console.log('No speech detected. Please try speaking again.');
+                    break;
+                case 'audio-capture':
+                    alert('Microphone not accessible. Please check your microphone permissions.');
+                    setIsListening(false);
+                    break;
+                case 'not-allowed':
+                    alert('Microphone permission denied. Please allow microphone access to use voice input.');
+                    setIsListening(false);
+                    break;
+                case 'network':
+                    console.log('Network error during speech recognition.');
+                    break;
+                case 'aborted':
+                    console.log('Speech recognition aborted.');
+                    break;
+                default:
+                    console.log('Speech recognition error:', event.error);
+            }
         };
 
         recognition.onresult = (event) => {
             let finalTranscript = "";
             let interimTranscript = "";
 
+            // Process only new results to avoid duplicates
             for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+
                 if (event.results[i].isFinal) {
-                    finalTranscript += event.results[i][0].transcript;
+                    finalTranscript += transcript + " ";
                 } else {
-                    interimTranscript += event.results[i][0].transcript;
+                    interimTranscript += transcript;
                 }
             }
 
-            // Combine previous transcript + new final + interim
-            // Actually 'continuous' might append? 
-            // The simplest way with continuous is to just grab the latest 'final' or accumulate.
-            // For now, let's just grab everything.
+            // Update accumulated final transcript
+            if (finalTranscript) {
+                setVoiceTranscript(prev => (prev + finalTranscript).trim());
+            }
 
-            // Better approach for simple input:
-            const currentText = Array.from(event.results)
-                .map(result => result[0].transcript)
-                .join('');
-
-            setVoiceTranscript(currentText);
-            // setInput(currentText); // Don't show in text field while recording, as per requests
+            // For interim results, we could show them separately if needed
+            // Currently just logging for debugging
+            if (interimTranscript && !finalTranscript) {
+                // Show interim in console for debugging
+                console.log('Interim:', interimTranscript);
+            }
         };
 
         recognitionRef.current = recognition;
@@ -801,15 +827,34 @@ export default function ChatScreenMui() {
         setInput(""); // Clear any partial input
     }
 
+    // Helper function to format voice transcript with proper capitalization and punctuation
+    function formatTranscript(text) {
+        if (!text) return '';
+
+        // Trim whitespace
+        let formatted = text.trim();
+
+        // Capitalize first letter
+        formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+
+        // Add period at end if no punctuation exists
+        if (!/[.!?]$/.test(formatted)) {
+            formatted += '.';
+        }
+
+        return formatted;
+    }
+
     function handleConfirmVoice() {
         const recognition = recognitionRef.current;
         if (recognition) recognition.stop();
         setIsListening(false);
 
         if (voiceTranscript.trim()) {
+            const formattedTranscript = formatTranscript(voiceTranscript);
             setLastInputWasVoice(true);
             setConversationMode(true);
-            sendToServer(voiceTranscript, true); // true = isVoice
+            sendToServer(formattedTranscript, true); // true = isVoice
             setInput("");
             setVoiceTranscript("");
         }
@@ -1137,8 +1182,12 @@ export default function ChatScreenMui() {
             }}
         >
             <CssBaseline />
+            {!splashComplete && (
+                <SplashScreen onComplete={() => setSplashComplete(true)} />
+            )}
             <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
 
+            {/* Main App Content */}
             {/* Mobile Sidebar (Drawer) */}
             <Drawer
                 anchor="left"
@@ -1216,6 +1265,10 @@ export default function ChatScreenMui() {
                             sx={{
                                 color: ACCENT_DARK,
                                 fontWeight: 500,
+                                transition: 'transform 0.2s ease-in-out',
+                                '&:hover': {
+                                    transform: 'translateY(-4px)',
+                                },
                             }}
                         >
                             Sign up
@@ -1232,37 +1285,48 @@ export default function ChatScreenMui() {
                         top: 0,
                         left: 0,
                         right: 0,
-                        height: 72,
-                        bgcolor: "transparent",
+                        height: 60,
+                        background: 'transparent',
+                        backdropFilter: 'blur(8px)',
+                        WebkitBackdropFilter: 'blur(8px)',
                         display: "flex",
                         alignItems: "center",
-                        px: 3,
-                        py: 2,
+                        justifyContent: "space-between",
+                        px: 2.5,
                         zIndex: 1200,
                     }}
                 >
-                    <IconButton onClick={() => setMobileOpen(true)} sx={{ p: 0.5 }}>
+                    {/* Left: Menu Button */}
+                    <IconButton
+                        onClick={() => setMobileOpen(true)}
+                        sx={{
+                            p: 1,
+                        }}
+                    >
                         <AnimatedMenuIcon
                             color={SIDEBAR_BG}
-                            size={24}
+                            size={22}
                             isOpen={mobileOpen}
                             animateOnHover={false}
                         />
                     </IconButton>
 
-                    <Box sx={{ flex: 1 }} />
-
+                    {/* Right: User Avatar or Sign Up */}
                     {user ? (
-                        <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                        <IconButton
+                            onClick={handleSignupClick}
+                            sx={{
+                                p: 0,
+                            }}
+                        >
                             <Box
                                 component="img"
                                 src={user.avatar}
                                 alt={user.name}
                                 sx={{
-                                    width: 32,
-                                    height: 32,
+                                    width: 36,
+                                    height: 36,
                                     borderRadius: "50%",
-                                    border: "2px solid #CAA361",
                                     objectFit: "cover",
                                 }}
                             />
@@ -1275,6 +1339,10 @@ export default function ChatScreenMui() {
                                 fontWeight: 600,
                                 fontSize: 13,
                                 textTransform: "none",
+                                transition: 'transform 0.2s ease-in-out',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                },
                             }}
                         >
                             Sign up
@@ -1501,7 +1569,9 @@ export default function ChatScreenMui() {
                                         px: 2,
                                     }}
                                 >
-                                    Welcome to Luna
+                                    <TypingAnimation duration={100} delay={!splashComplete}>
+                                        Welcome to Luna
+                                    </TypingAnimation>
                                 </Typography>
 
                                 <Typography
@@ -1531,7 +1601,7 @@ export default function ChatScreenMui() {
                             >
                                 {isMobile ? (
                                     <>
-                                        <TypingAnimation duration={80}>
+                                        <TypingAnimation duration={80} delay={!splashComplete}>
                                             Welcome to Luna
                                         </TypingAnimation>
                                         {" "}
@@ -1859,7 +1929,7 @@ export default function ChatScreenMui() {
                                 display: "flex",
                                 flexDirection: "column",
                                 minHeight: "100vh",
-                                pt: { xs: 4, md: 6 },
+                                pt: { xs: 8, md: 6 },
                                 pb: 2,
                             }}
                         >

@@ -11,13 +11,23 @@ export default function TypingAnimation({
     duration = 200,
     className = '',
     style = {},
+    delay = false,
     ...props
 }) {
     const text = typeof children === 'string' ? children : '';
     const [displayedText, setDisplayedText] = useState('');
     const [i, setI] = useState(0);
+    const [hasStarted, setHasStarted] = useState(!delay);
 
     useEffect(() => {
+        if (!delay) {
+            setHasStarted(true);
+        }
+    }, [delay]);
+
+    useEffect(() => {
+        if (!hasStarted) return;
+
         const typingEffect = setInterval(() => {
             if (i < text.length) {
                 setDisplayedText(text.substring(0, i + 1));
@@ -30,7 +40,7 @@ export default function TypingAnimation({
         return () => {
             clearInterval(typingEffect);
         };
-    }, [duration, i, text]);
+    }, [duration, i, text, hasStarted]);
 
     return (
         <span className={className} style={style} {...props}>
