@@ -24,6 +24,9 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import SearchIcon from "@mui/icons-material/Search";
+import InputAdornment from "@mui/material/InputAdornment";
+import TextField from "@mui/material/TextField";
 import flowerGridLogo from "../assets/flower.png";
 import PeopleIcon from "../assets/none.png";
 
@@ -36,6 +39,7 @@ export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
   const [selectedSummary, setSelectedSummary] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -89,11 +93,20 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
-  const usersForTable = Object.values(summariesByUser).map(userSummaries =>
-    userSummaries.sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    )[0]
-  );
+  const usersForTable = Object.values(summariesByUser)
+    .map(userSummaries =>
+      userSummaries.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      )[0]
+    )
+    .filter(user => {
+      if (!searchQuery) return true;
+      const lowerQuery = searchQuery.toLowerCase();
+      return (
+        (user.name && user.name.toLowerCase().includes(lowerQuery)) ||
+        (user.email && user.email.toLowerCase().includes(lowerQuery))
+      );
+    });
 
   const totalProspects = usersForTable.length;
 
@@ -246,6 +259,29 @@ export default function AdminDashboard() {
               >
                 All Prospects
               </Typography>
+
+              <TextField
+                placeholder="Search by name or email..."
+                variant="outlined"
+                size="small"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                sx={{
+                  bgcolor: "#F5F1E8",
+                  borderRadius: 2,
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { border: "none" },
+                  },
+                  width: { xs: "100%", sm: 300 },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={{ color: "#6B5744" }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
             </Box>
 
             {isMobile ? (
