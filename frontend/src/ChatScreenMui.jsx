@@ -22,7 +22,10 @@ import MenuItem from "@mui/material/MenuItem";
 import Button from "@mui/material/Button";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Drawer from "@mui/material/Drawer";
-import MenuIcon from "@mui/icons-material/Menu";
+import AnimatedMenuIcon from "./AnimatedMenuIcon";
+import AnimateIcon from "./components/AnimateIcon";
+import AnimatedXIcon from "./components/AnimatedXIcon";
+import TypingAnimation from "./components/TypingAnimation";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
 import CheckIcon from '@mui/icons-material/Check';
@@ -851,7 +854,7 @@ export default function ChatScreenMui() {
                 }}>
                     <img src={flowerLogo} alt="logo" style={{ width: 42, height: "auto" }} />
                     <IconButton onClick={() => setMobileOpen(false)} sx={{ color: "#EDDBBF" }}>
-                        <CloseIcon />
+                        <AnimatedXIcon color="#EDDBBF" size={24} />
                     </IconButton>
                 </Box>
             )}
@@ -963,16 +966,18 @@ export default function ChatScreenMui() {
                                     },
                                 }}
                             >
-                                <img
-                                    src={icon}
-                                    alt={label}
-                                    style={{
-                                        width: 22,
-                                        height: 22,
-                                        objectFit: "contain",
-                                        filter: "brightness(0) invert(1)",
-                                    }}
-                                />
+                                <AnimateIcon animateOnHover animationType="bounce">
+                                    <img
+                                        src={icon}
+                                        alt={label}
+                                        style={{
+                                            width: 22,
+                                            height: 22,
+                                            objectFit: "contain",
+                                            filter: "brightness(0) invert(1)",
+                                        }}
+                                    />
+                                </AnimateIcon>
                             </IconButton>
                             {(!isDesktop || !collapsed) && (
                                 <Typography
@@ -1236,8 +1241,13 @@ export default function ChatScreenMui() {
                         zIndex: 1200,
                     }}
                 >
-                    <IconButton onClick={() => setMobileOpen(true)} sx={{ color: SIDEBAR_BG }}>
-                        <MenuIcon />
+                    <IconButton onClick={() => setMobileOpen(true)} sx={{ p: 0.5 }}>
+                        <AnimatedMenuIcon
+                            color={SIDEBAR_BG}
+                            size={24}
+                            isOpen={mobileOpen}
+                            animateOnHover={false}
+                        />
                     </IconButton>
 
                     <Box sx={{ flex: 1 }} />
@@ -1519,10 +1529,24 @@ export default function ChatScreenMui() {
                                     px: 2,
                                 }}
                             >
-                                Welcome to Luna{" "}
-                                <Box component="span" sx={{ fontWeight: 400 }}>
-                                    — Your Reflective AI Wellness Companion
-                                </Box>
+                                {isMobile ? (
+                                    <>
+                                        <TypingAnimation duration={80}>
+                                            Welcome to Luna
+                                        </TypingAnimation>
+                                        {" "}
+                                        <Box component="span" sx={{ fontWeight: 400 }}>
+                                            - Your Reflective AI Wellness Companion
+                                        </Box>
+                                    </>
+                                ) : (
+                                    <>
+                                        Welcome to Luna{" "}
+                                        <Box component="span" sx={{ fontWeight: 400 }}>
+                                            - Your Reflective AI Wellness Companion
+                                        </Box>
+                                    </>
+                                )}
                             </Typography>
                         )}
 
