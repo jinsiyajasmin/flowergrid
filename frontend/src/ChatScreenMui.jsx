@@ -159,7 +159,7 @@ export default function ChatScreenMui() {
 
 
     const menuItems = [
-        { icon: chatIcon, label: "Chat with Flora" },
+        { icon: chatIcon, label: "Chat with Luna" },
         { icon: testIcon, label: "Self Tests" },
         { icon: bookIcon, label: "Book a Therapist" },
         { icon: worksheetsIcon, label: "Worksheets" },
@@ -939,7 +939,7 @@ export default function ChatScreenMui() {
                     <Tooltip key={label} title={(isDesktop && collapsed) ? label : ""} placement="right">
                         <Box
                             onClick={() => {
-                                if (label === "Chat with Flora") startNewChat();
+                                if (label === "Chat with Luna") startNewChat();
                                 if (!isDesktop) setMobileOpen(false);
                             }}
                             sx={{
@@ -1800,7 +1800,7 @@ export default function ChatScreenMui() {
                                         fontWeight: 300,
                                     }}
                                 >
-                                    Disclaimer: Flora offers support, not medical care.
+                                    Disclaimer: Luna offers support, not medical care.
                                     Always consult a professional.
                                 </Typography>
                             </>
@@ -1822,7 +1822,7 @@ export default function ChatScreenMui() {
                                     textAlign: "center"
                                 }}
                             >
-                                Disclaimer: Flora offers support, not medical care.<br />
+                                Disclaimer: Luna offers support, not medical care.
                                 Always consult a professional.
                             </Typography>
                         </Box>

@@ -30,7 +30,7 @@ import PeopleIcon from "../assets/none.png";
 
 
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://flowergrid-7mw2.vercel.app";
+const API_BASE = "https://flowergrid-7mw2.vercel.app";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
