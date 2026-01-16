@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Typography } from '@mui/material';
-import flowerLogo from '../../assets/flowergrid_logo_v2.jpg';
+import flowerLogo from '../../assets/flower.png';
 
 const ACCENT_DARK = "#5B3F2A"; // Matches the app's accent color
 
@@ -53,23 +53,43 @@ export default function SplashScreen({ onComplete }) {
                             gap: 24,
                         }}
                     >
-                        {/* Static Flowergrid Logo */}
+                        {/* Rotating Flower Logo */}
                         <motion.img
                             src={flowerLogo}
                             alt="Flowergrid Logo"
-                            animate={{ scale: [0.9, 1, 0.9] }}
+                            animate={{ rotate: 360 }}
                             transition={{
-                                duration: 3,
+                                duration: 20,
                                 repeat: Infinity,
-                                ease: "easeInOut"
+                                ease: "linear"
                             }}
                             style={{
-                                width: 180,
-                                height: 'auto',
+                                width: 120,
+                                height: 120,
                                 objectFit: 'contain',
-                                borderRadius: 20,
+                                filter: 'drop-shadow(0 4px 12px rgba(91, 63, 42, 0.15))'
                             }}
                         />
+
+                        {/* Text Animation */}
+                        <motion.div
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.3, duration: 0.8 }}
+                        >
+                            <Typography
+                                variant="h3"
+                                sx={{
+                                    fontFamily: '"Outfit", sans-serif',
+                                    fontWeight: 600,
+                                    color: ACCENT_DARK,
+                                    letterSpacing: '1px',
+                                    textAlign: 'center',
+                                }}
+                            >
+                                Flowergrid
+                            </Typography>
+                        </motion.div>
                     </motion.div>
                 </motion.div>
             )}
