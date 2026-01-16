@@ -328,29 +328,26 @@ export default function ChatScreenMui() {
         };
 
         recognition.onresult = (event) => {
-            let finalTranscript = "";
+            let fullTranscript = "";
             let interimTranscript = "";
 
-            // Process only new results to avoid duplicates
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
+            // Rebuild transcript from scratch to avoid duplicates
+            for (let i = 0; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
-
                 if (event.results[i].isFinal) {
-                    finalTranscript += transcript + " ";
+                    fullTranscript += transcript + " ";
                 } else {
                     interimTranscript += transcript;
                 }
             }
 
-            // Update accumulated final transcript
-            if (finalTranscript) {
-                setVoiceTranscript(prev => (prev + finalTranscript).trim());
+            // Update transcript state with the full rebuilt string
+            if (fullTranscript) {
+                setVoiceTranscript(fullTranscript.trim());
             }
 
-            // For interim results, we could show them separately if needed
-            // Currently just logging for debugging
-            if (interimTranscript && !finalTranscript) {
-                // Show interim in console for debugging
+            // Log interim for debugging if needed
+            if (interimTranscript) {
                 console.log('Interim:', interimTranscript);
             }
         };
@@ -1726,7 +1723,7 @@ export default function ChatScreenMui() {
                                             "&:hover": {
                                                 bgcolor: "transparent",
                                             },
-                                            opacity: isListening ? 1 : 0.9,
+                                            display: isListening ? "none" : "inline-flex", // Hide when listening to avoid blocking overlay buttons
                                         }}
                                     >
                                         <Box
