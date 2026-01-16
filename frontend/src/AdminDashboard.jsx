@@ -273,6 +273,7 @@ export default function AdminDashboard() {
                     "& fieldset": { border: "none" },
                   },
                   width: { xs: "100%", sm: 300 },
+                  mt: 2,
                 }}
                 InputProps={{
                   startAdornment: (
