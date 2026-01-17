@@ -173,7 +173,7 @@ export default function ChatScreenMui() {
     ];
 
 
-    const API_BASE = "https://flowergrid.vercel.app";
+    const API_BASE = "https://flowergrid-7mw2.vercel.app";
 
     useEffect(() => {
         try {
