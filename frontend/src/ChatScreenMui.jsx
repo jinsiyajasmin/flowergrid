@@ -271,7 +271,7 @@ export default function ChatScreenMui() {
         const recognition = new SpeechRecognition();
         recognition.lang = "en-GB";
         recognition.interimResults = true; // Show real-time results
-        recognition.continuous = true; // Keep listening until stopped
+        recognition.continuous = !isMobile; // Continuous mode is often flaky on mobile (iOS/Android)
         recognition.maxAlternatives = 3; // Get more alternatives for better accuracy
 
 
