@@ -27,10 +27,9 @@ const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:5174',
+
   'http://localhost:4000',
-  'https://luna.flowergrid.co.uk',
-  'https://api.luna.flowergrid.co.uk',
+
   'https://flowergrid.vercel.app'
 ];
 
@@ -164,7 +163,7 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user;
-    const frontendUrl = "http://localhost:5173";
+    const frontendUrl = process.env.FRONTEND_URL || "https://flowergrid.vercel.app";
 
 
     const userPayload = {
