@@ -33,7 +33,7 @@ import PeopleIcon from "../assets/none.png";
 
 
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = "https://flowergrid.vercel.app";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
