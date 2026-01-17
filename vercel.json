@@ -1,0 +1,29 @@
+{
+    "functions": {
+        "server/index.js": {
+            "maxDuration": 30
+        }
+    },
+    "rewrites": [
+        {
+            "source": "/chat",
+            "destination": "/server/index.js"
+        },
+        {
+            "source": "/auth/:path*",
+            "destination": "/server/index.js"
+        },
+        {
+            "source": "/admin/:path*",
+            "destination": "/server/index.js"
+        },
+        {
+            "source": "/health",
+            "destination": "/server/index.js"
+        },
+        {
+            "source": "/(.*)",
+            "destination": "/frontend/index.html"
+        }
+    ]
+}
