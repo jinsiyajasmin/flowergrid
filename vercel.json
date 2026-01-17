@@ -23,12 +23,12 @@
             "destination": "/api/index.js"
         },
         {
-            "source": "/health",
+            "source": "/conversations/:path*",
             "destination": "/api/index.js"
         },
         {
-            "source": "/admin",
-            "destination": "/index.html"
+            "source": "/health",
+            "destination": "/api/index.js"
         },
         {
             "source": "/(.*)",
