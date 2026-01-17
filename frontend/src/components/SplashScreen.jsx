@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Typography } from '@mui/material';
 import flowerLogo from '../../assets/flower.png';
 
+import flowergridTextLogo from '../../assets/flowergrid_logo.png';
+
 const ACCENT_DARK = "#5B3F2A"; // Matches the app's accent color
 
 export default function SplashScreen({ onComplete }) {
@@ -73,22 +75,18 @@ export default function SplashScreen({ onComplete }) {
 
                         {/* Text Animation */}
                         <motion.div
-                            initial={{ y: 20, opacity: 0 }}
+                            initial={{ y: 100, opacity: 0 }} // Starts further down
                             animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3, duration: 0.8 }}
+                            transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
                         >
-                            <Typography
-                                variant="h3"
-                                sx={{
-                                    fontFamily: '"Outfit", sans-serif',
-                                    fontWeight: 600,
-                                    color: ACCENT_DARK,
-                                    letterSpacing: '1px',
-                                    textAlign: 'center',
+                            <img
+                                src={flowergridTextLogo}
+                                alt="Flowergrid"
+                                style={{
+                                    height: 60, // Adjust height as needed to match text size roughly
+                                    objectFit: 'contain'
                                 }}
-                            >
-                                Flowergrid
-                            </Typography>
+                            />
                         </motion.div>
                     </motion.div>
                 </motion.div>

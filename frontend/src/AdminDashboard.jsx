@@ -33,7 +33,7 @@ import PeopleIcon from "../assets/none.png";
 
 
 
-const API_BASE = "https://flowergrid-7mw2.vercel.app";
+const API_BASE = "http://localhost:4000";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
@@ -41,8 +41,23 @@ export default function AdminDashboard() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [error, setError] = useState("");
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (username === "saminadmin" && password === "Flowergrid123") {
+      setIsLoggedIn(true);
+      setError("");
+    } else {
+      setError("Invalid credentials");
+    }
+  };
 
   const fetchSummaries = async () => {
     try {
@@ -65,10 +80,12 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    fetchSummaries();
-    const interval = setInterval(fetchSummaries, 15000);
-    return () => clearInterval(interval);
-  }, []);
+    if (isLoggedIn) {
+      fetchSummaries();
+      const interval = setInterval(fetchSummaries, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn]);
 
   const handleViewSummary = (userEmail) => {
     const userSummaries = summariesByUser[userEmail] || [];
@@ -111,6 +128,106 @@ export default function AdminDashboard() {
   const totalProspects = usersForTable.length;
 
   const growthPercentage = 7;
+
+  if (!isLoggedIn) {
+    return (
+      <Box sx={{ minHeight: "100vh", display: "flex" }}>
+        {/* Left Sidebar for Login */}
+        {/* Single Column Layout */}
+        <Box sx={{
+          flex: 1,
+          bgcolor: "#F5E4C8",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 2
+        }}>
+          <Box
+            component="img"
+            src={flowerGridLogo}
+            alt="Flower Grid"
+            sx={{ width: 80, mb: 2 }}
+          />
+
+          <Typography variant="h5" sx={{ color: "#6B5744", mb: 4, fontWeight: 500 }}>
+            Welcome Samina
+          </Typography>
+
+          <Card sx={{
+            p: 4,
+            bgcolor: "#EAD1A8",
+            borderRadius: 3,
+            boxShadow: "none",
+            width: "100%",
+            maxWidth: 400,
+            textAlign: "center"
+          }}>
+            <Typography variant="body2" sx={{ color: "#8B7355", mb: 3 }}>
+              Please sign in to continue
+            </Typography>
+
+            <form onSubmit={handleLogin}>
+              <TextField
+                fullWidth
+                variant="outlined"
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                sx={{
+                  mb: 2,
+                  bgcolor: "#F5F1E8",
+                  borderRadius: 2,
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { border: "none" },
+                  },
+                }}
+              />
+              <TextField
+                fullWidth
+                variant="outlined"
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                sx={{
+                  mb: 2,
+                  bgcolor: "#F5F1E8",
+                  borderRadius: 2,
+                  "& .MuiOutlinedInput-root": {
+                    "& fieldset": { border: "none" },
+                  },
+                }}
+              />
+              {error && (
+                <Typography color="error" variant="caption" sx={{ display: "block", mb: 2 }}>
+                  {error}
+                </Typography>
+              )}
+              <Button
+                fullWidth
+                variant="contained"
+                type="submit"
+                sx={{
+                  bgcolor: "#5b3f2a",
+                  color: "white",
+                  textTransform: "none",
+                  borderRadius: 2,
+                  py: 1.2,
+                  fontSize: 16,
+                  "&:hover": {
+                    bgcolor: "#4a3322",
+                  },
+                }}
+              >
+                Login
+              </Button>
+            </form>
+          </Card>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{
@@ -191,7 +308,7 @@ export default function AdminDashboard() {
           <Card sx={{
             mb: 4,
             p: 3,
-            bgcolor: "#EAD1A8",
+            bgcolor: "#c9b07a",
             borderRadius: 3,
             boxShadow: "none",
             maxWidth: 300,
@@ -247,7 +364,7 @@ export default function AdminDashboard() {
 
           <Card sx={{
             borderRadius: 3,
-            bgcolor: "#EAD1A8",
+            bgcolor: "#c9b07a",
             boxShadow: "none",
             overflow: "hidden",
           }}>
@@ -339,7 +456,7 @@ export default function AdminDashboard() {
                       <TableCell sx={{
                         color: "#6B5744",
                         fontWeight: 500,
-                        bgcolor: "#EAD1A8",
+                        bgcolor: "#c9b07a",
                         borderBottom: "1px solid #D9CDB8",
                       }}>
                         Name
@@ -348,7 +465,7 @@ export default function AdminDashboard() {
                       <TableCell sx={{
                         color: "#6B5744",
                         fontWeight: 500,
-                        bgcolor: "#EAD1A8",
+                        bgcolor: "#c9b07a",
                         borderBottom: "1px solid #D9CDB8",
                       }}>
                         Mail
@@ -358,7 +475,7 @@ export default function AdminDashboard() {
                         sx={{
                           color: "#6B5744",
                           fontWeight: 500,
-                          bgcolor: "#EAD1A8",
+                          bgcolor: "#c9b07a",
                           borderBottom: "1px solid #D9CDB8",
                         }}
                       >
@@ -372,9 +489,9 @@ export default function AdminDashboard() {
                       <TableRow
                         key={item._id}
                         sx={{
-                          bgcolor: index % 2 === 0 ? "#F5F1E8" : "#EAD1A8",
+                          bgcolor: "#c9b07a",
                           "&:hover": {
-                            bgcolor: "#DFD3BF",
+                            bgcolor: "#bca370",
                           },
                         }}
                       >
@@ -483,7 +600,7 @@ export default function AdminDashboard() {
                 variant="caption"
                 sx={{ color: "#8B7355", display: "block", mb: 1 }}
               >
-                {new Date(item.createdAt).toLocaleString()}
+                {new Date(item.createdAt).toLocaleString('en-GB', { hour: 'numeric', minute: 'numeric', hour12: true, day: 'numeric', month: 'short', year: 'numeric' })}
               </Typography>
 
               <Typography

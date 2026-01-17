@@ -173,7 +173,7 @@ export default function ChatScreenMui() {
     ];
 
 
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://flowergrid-7mw2.vercel.app";
+    const API_BASE = "http://localhost:4000";
 
     useEffect(() => {
         try {
@@ -342,9 +342,10 @@ export default function ChatScreenMui() {
                 }
             }
 
-            // Update transcript state with the full rebuilt string
-            if (fullTranscript) {
-                setVoiceTranscript(fullTranscript.trim());
+            // Update transcript state with the full rebuilt string (including interim)
+            const currentTranscript = (fullTranscript + interimTranscript).trim();
+            if (currentTranscript) {
+                setVoiceTranscript(currentTranscript);
             }
 
             // Log interim for debugging if needed
@@ -2065,7 +2066,8 @@ export default function ChatScreenMui() {
                                 sx={{
                                     borderTop: 1,
                                     borderColor: "rgba(0,0,0,0.08)",
-                                    py: 2,
+                                    pt: 2,
+                                    pb: 0.5,
                                     position: "sticky",
                                     bottom: 0,
                                     background: BG_GRADIENT,
@@ -2224,6 +2226,21 @@ export default function ChatScreenMui() {
                                             />
                                         </Box>
                                     </Box>
+                                    <Typography
+                                        variant="caption"
+                                        align="center"
+                                        sx={{
+                                            color: "rgba(80, 57, 32, 0.8)",
+                                            fontSize: 12,
+                                            fontWeight: 400,
+                                            display: "block",
+                                            textAlign: "center",
+                                            mt: 1.5,
+                                            width: "100%",
+                                        }}
+                                    >
+                                        Disclaimer: Luna offers support, not medical care. Always consult a professional.
+                                    </Typography>
                                 </Container>
                             </Box>
                         </Box>

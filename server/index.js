@@ -27,6 +27,7 @@ const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174',
   'http://localhost:4000',
   'https://luna.flowergrid.co.uk',
   'https://api.luna.flowergrid.co.uk',
@@ -156,7 +157,7 @@ app.get(
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
     const user = req.user;
-    const frontendUrl = process.env.FRONTEND_URL || "https://flowergrid.vercel.app";
+    const frontendUrl = "http://localhost:5173";
 
 
     const userPayload = {
@@ -398,7 +399,7 @@ function getSessionMessages(sessionId) {
 async function textToSpeech(text) {
   const response = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts", // high-quality, calm voice
-    voice: "alloy",           // neutral, soothing
+    voice: "shimmer",           // soft, young lady's voice
     input: text,
     format: "mp3"
   });
