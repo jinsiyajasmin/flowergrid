@@ -167,8 +167,11 @@ export default function ChatScreenMui() {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
 
-    // Landing Intro State
-    const [showLanding, setShowLanding] = useState(true);
+    // Landing Intro State - Show only once per session
+    const [showLanding, setShowLanding] = useState(() => {
+        const hasSeenLanding = sessionStorage.getItem('hasSeenLanding');
+        return !hasSeenLanding;
+    });
 
     // Voice Chat Mode State
     const [voiceModalOpen, setVoiceModalOpen] = useState(false);
@@ -1308,248 +1311,173 @@ export default function ChatScreenMui() {
     );
 
     return (
-        <Box
-            sx={{
-                display: "flex",
-                minHeight: "100vh",
-                height: "100vh",
-                background: BG_GRADIENT,
-                marginLeft: 0,
-                fontFamily:
-                    "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
-                overflowY: "auto",
-            }}
-        >
-            <CssBaseline />
+        <>
+            {/* Prevent mobile keyboard from pushing entire page up */}
+            <style>{`
+                @media (max-width: 900px) {
+                    body {
+                        position: fixed;
+                        width: 100%;
+                        height: 100vh;
+                        overflow: hidden;
+                    }
+                }
+            `}</style>
 
-            {/* Landing Intro Animation */}
-            {showLanding && (
-                <LandingIntro onComplete={() => setShowLanding(false)} />
-            )}
-
-            <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
-
-            {/* Main App Content */}
-            {/* Mobile Sidebar (Drawer) */}
-            <Drawer
-                anchor="left"
-                open={mobileOpen}
-                onClose={() => setMobileOpen(false)}
+            <Box
                 sx={{
-                    "& .MuiDrawer-paper": {
-                        width: sidebarWidth,
-                        bgcolor: SIDEBAR_BG,
-                        color: "#EDDBBF",
-                        p: 2,
-                        boxShadow: "none",
-                        backgroundImage: "none"
-                    },
+                    display: "flex",
+                    minHeight: "100vh",
+                    height: "100vh",
+                    background: BG_GRADIENT,
+                    marginLeft: 0,
+                    fontFamily:
+                        "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
+                    overflowY: "auto",
                 }}
             >
-                {renderSidebarContent(false)}
-            </Drawer>
+                <CssBaseline />
 
-            {/* Desktop Sidebar */}
-            {!isMobile && (
-                <Box
+                {/* Landing Intro Animation */}
+                {showLanding && (
+                    <LandingIntro onComplete={() => {
+                        sessionStorage.setItem('hasSeenLanding', 'true');
+                        setShowLanding(false);
+                    }} />
+                )}
+
+                <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
+
+                {/* Main App Content */}
+                {/* Mobile Sidebar (Drawer) */}
+                <Drawer
+                    anchor="left"
+                    open={mobileOpen}
+                    onClose={() => setMobileOpen(false)}
                     sx={{
-                        width: collapsed ? 180 : sidebarWidth,
-                        bgcolor: SIDEBAR_BG,
-                        color: "#664B2E",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        py: 3,
-                        px: collapsed ? 1 : 2,
-                        gap: 2,
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        height: "100vh",
-                        zIndex: 1300,
-                        overflowY: "auto",
-                        transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
-                        scrollbarWidth: 'none',
-                        "&::-webkit-scrollbar": { display: "none" }
+                        "& .MuiDrawer-paper": {
+                            width: sidebarWidth,
+                            bgcolor: SIDEBAR_BG,
+                            color: "#EDDBBF",
+                            p: 2,
+                            boxShadow: "none",
+                            backgroundImage: "none"
+                        },
                     }}
                 >
-                    {renderSidebarContent(true)}
-                </Box>
-            )}
+                    {renderSidebarContent(false)}
+                </Drawer>
 
-            {!isMobile && (
-                <Box
-                    sx={{
-                        position: "fixed",
-                        top: 16,
-                        right: 24,
-                        zIndex: 2000,
-                    }}
-                >
-                    {user ? (
-                        <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
-                            <Box
-                                component="img"
-                                src={user.avatar}
-                                alt={user.name}
-                                sx={{
-                                    width: 38,
-                                    height: 38,
-                                    borderRadius: "50%",
-                                    border: "2px solid #CAA361",
-                                    objectFit: "cover",
-                                }}
-                            />
-                        </IconButton>
-                    ) : (
-                        <Button
-                            onClick={handleSignupClick}
-                            sx={{
-                                color: ACCENT_DARK,
-                                fontWeight: 500,
-                                transition: 'transform 0.2s ease-in-out',
-                                '&:hover': {
-                                    transform: 'translateY(-4px)',
-                                },
-                            }}
-                        >
-                            Sign up
-                        </Button>
-                    )}
-                </Box>
-            )}
-
-            {/* Mobile Top Navigation */}
-            {isMobile && (
-                <Box
-                    sx={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 60,
-                        background: 'transparent',
-                        backdropFilter: 'blur(8px)',
-                        WebkitBackdropFilter: 'blur(8px)',
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        px: 2.5,
-                        zIndex: 1200,
-                    }}
-                >
-                    {/* Left: Menu Button */}
-                    <IconButton
-                        onClick={() => setMobileOpen(true)}
+                {/* Desktop Sidebar */}
+                {!isMobile && (
+                    <Box
                         sx={{
-                            p: 1,
+                            width: collapsed ? 180 : sidebarWidth,
+                            bgcolor: SIDEBAR_BG,
+                            color: "#664B2E",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            py: 3,
+                            px: collapsed ? 1 : 2,
+                            gap: 2,
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            height: "100vh",
+                            zIndex: 1300,
+                            overflowY: "auto",
+                            transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                            scrollbarWidth: 'none',
+                            "&::-webkit-scrollbar": { display: "none" }
                         }}
                     >
-                        <AnimatedMenuIcon
-                            color={SIDEBAR_BG}
-                            size={22}
-                            isOpen={mobileOpen}
-                            animateOnHover={false}
-                        />
-                    </IconButton>
+                        {renderSidebarContent(true)}
+                    </Box>
+                )}
 
-                    {/* Right: User Avatar or Sign Up */}
-                    {user ? (
+                {!isMobile && (
+                    <Box
+                        sx={{
+                            position: "fixed",
+                            top: 16,
+                            right: 24,
+                            zIndex: 2000,
+                        }}
+                    >
+                        {user ? (
+                            <IconButton onClick={handleSignupClick} sx={{ p: 0 }}>
+                                <Box
+                                    component="img"
+                                    src={user.avatar}
+                                    alt={user.name}
+                                    sx={{
+                                        width: 38,
+                                        height: 38,
+                                        borderRadius: "50%",
+                                        border: "2px solid #CAA361",
+                                        objectFit: "cover",
+                                    }}
+                                />
+                            </IconButton>
+                        ) : (
+                            <Button
+                                onClick={handleSignupClick}
+                                sx={{
+                                    color: ACCENT_DARK,
+                                    fontWeight: 500,
+                                    transition: 'transform 0.2s ease-in-out',
+                                    '&:hover': {
+                                        transform: 'translateY(-4px)',
+                                    },
+                                }}
+                            >
+                                Sign up
+                            </Button>
+                        )}
+                    </Box>
+                )}
+
+                {/* Mobile Top Navigation */}
+                {isMobile && (
+                    <Box
+                        sx={{
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: 60,
+                            background: 'transparent',
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            px: 2.5,
+                            zIndex: 1200,
+                        }}
+                    >
+                        {/* Left: Menu Button */}
                         <IconButton
-                            onClick={handleSignupClick}
+                            onClick={() => setMobileOpen(true)}
                             sx={{
-                                p: 0,
+                                p: 1,
                             }}
                         >
-                            <Box
-                                component="img"
-                                src={user.avatar}
-                                alt={user.name}
-                                sx={{
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                }}
+                            <AnimatedMenuIcon
+                                color={SIDEBAR_BG}
+                                size={22}
+                                isOpen={mobileOpen}
+                                animateOnHover={false}
                             />
                         </IconButton>
-                    ) : (
-                        <Button
-                            onClick={handleSignupClick}
-                            sx={{
-                                color: ACCENT_DARK,
-                                fontWeight: 600,
-                                fontSize: 13,
-                                textTransform: "none",
-                                transition: 'transform 0.2s ease-in-out',
-                                '&:hover': {
-                                    transform: 'translateY(-2px)',
-                                },
-                            }}
-                        >
-                            Sign up
-                        </Button>
-                    )}
-                </Box>
-            )}
 
-            {/* Login Overlay / Disabler */}
-            {inputDisabled && !user && (
-                <Box sx={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 9999,
-                    pointerEvents: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                }}>
-                </Box>
-            )}
-
-
-
-
-
-
-            <Menu
-                anchorEl={signupAnchorEl}
-                open={signupOpen}
-                onClose={handleSignupClose}
-                anchorOrigin={{
-                    vertical: "bottom",
-                    horizontal: "right",
-                }}
-                transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                }}
-                PaperProps={{
-                    sx: {
-                        borderRadius: 2,
-                        mt: 1,
-                        minWidth: 220,
-                        boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
-                    },
-                }}
-            >
-                {user ? (
-                    <>
-                        <MenuItem
-                            disableRipple
-                            sx={{
-                                pointerEvents: "none",
-                                "&:hover": { background: "transparent" },
-                            }}
-                        >
-                            <Box
+                        {/* Right: User Avatar or Sign Up */}
+                        {user ? (
+                            <IconButton
+                                onClick={handleSignupClick}
                                 sx={{
-                                    width: "100%",
-                                    textAlign: "center",
-                                    py: 1,
+                                    p: 0,
                                 }}
                             >
                                 <Box
@@ -1557,980 +1485,1073 @@ export default function ChatScreenMui() {
                                     src={user.avatar}
                                     alt={user.name}
                                     sx={{
-                                        width: 48,
-                                        height: 48,
+                                        width: 36,
+                                        height: 36,
                                         borderRadius: "50%",
-                                        mb: 1,
+                                        objectFit: "cover",
                                     }}
                                 />
-                                <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
-                                    {user.name}
-                                </Typography>
-                                <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
-                                    {user.email}
-                                </Typography>
-                            </Box>
-                        </MenuItem>
-
-                        <Box sx={{ px: 2, my: 1 }}>
-                            <Box sx={{ height: 1, bgcolor: "#E5E7EB" }} />
-                        </Box>
-
-                        <MenuItem
-                            onClick={handleLogout}
-                            sx={{
-                                justifyContent: "center",
-                                color: "#B91C1C",
-                                fontWeight: 500,
-                            }}
-                        >
-                            Logout
-                        </MenuItem>
-                    </>
-                ) : (
-                    <MenuItem
-                        disableRipple
-                        sx={{
-                            pt: 3,
-                            pb: 2,
-                            "&:hover": { background: "transparent" },
-                        }}
-                    >
-                        <Box sx={{ width: "100%" }}>
-                            <Typography
+                            </IconButton>
+                        ) : (
+                            <Button
+                                onClick={handleSignupClick}
                                 sx={{
-                                    mb: 2,
-                                    textAlign: "center",
-                                    fontSize: 14,
+                                    color: ACCENT_DARK,
                                     fontWeight: 600,
-                                    color: "#374151",
-                                }}
-                            >
-                                Sign up
-                            </Typography>
-
-                            <Box
-                                onClick={() => {
-                                    handleSignupClose();
-                                    window.location.href = `${API_BASE}/auth/google`;
-                                }}
-                                sx={{
-                                    width: "100%",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 1.5,
-                                    py: 1.4,
-                                    px: 3,
-                                    borderRadius: "14px",
-                                    backgroundColor: "#F9FAFB",
-                                    color: "#111827",
-                                    border: "1px solid #E5E7EB",
-                                    cursor: "pointer",
-                                    "&:hover": {
-                                        backgroundColor: "#F3F4F6",
+                                    fontSize: 13,
+                                    textTransform: "none",
+                                    transition: 'transform 0.2s ease-in-out',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
                                     },
                                 }}
                             >
-                                <Box
-                                    component="img"
-                                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                                    alt="Google"
-                                    sx={{ width: 20, height: 20 }}
-                                />
-                                <Typography sx={{ fontWeight: 500 }}>
-                                    Continue with Google
-                                </Typography>
-                            </Box>
-                        </Box>
-                    </MenuItem>
+                                Sign up
+                            </Button>
+                        )}
+                    </Box>
                 )}
-            </Menu>
-            <Box
-                sx={{
-                    flex: 1,
-                    marginLeft: isMobile ? 0 : (collapsed ? "100px" : `${sidebarWidth}px`),
-                    height: "100vh",
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                    transition: "margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",
-                    pt: isMobile ? "72px" : 0, // Padding for mobile header
-                    // Masking to fade chats behind the transparent top nav
-                    ...(isMobile && {
-                        maskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
-                        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
-                    })
-                }}
-            >
-                <Container
-                    maxWidth="lg"
-                    sx={{
-                        flex: 1,
-                        display: "flex",
-                        flexDirection: "column",
-                        px: isMobile ? 2 : 3,
-                        minHeight: "100%",
-                        position: "relative",
+
+                {/* Login Overlay / Disabler */}
+                {inputDisabled && !user && (
+                    <Box sx={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 9999,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}>
+                    </Box>
+                )}
+
+
+
+
+
+
+                <Menu
+                    anchorEl={signupAnchorEl}
+                    open={signupOpen}
+                    onClose={handleSignupClose}
+                    anchorOrigin={{
+                        vertical: "bottom",
+                        horizontal: "right",
+                    }}
+                    transformOrigin={{
+                        vertical: "top",
+                        horizontal: "right",
+                    }}
+                    PaperProps={{
+                        sx: {
+                            borderRadius: 2,
+                            mt: 1,
+                            minWidth: 220,
+                            boxShadow: "0 12px 30px rgba(0,0,0,0.18)",
+                        },
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: conversationMode ? "none" : "flex",
-                            flex: 1,
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            pt: conversationMode ? 0 : { xs: 0, md: 10 },
-                            transition: "opacity 320ms ease, transform 320ms ease",
-                            opacity: conversationMode ? 0 : 1,
-                            transform: conversationMode
-                                ? "translateY(-10px) scale(0.99)"
-                                : "none",
-                        }}
-                    >
-                        {/* --- Voice Chat Modal (Global) --- */}
-                        <Dialog
-                            open={voiceModalOpen}
-                            onClose={() => setVoiceModalOpen(false)}
-                            PaperProps={{
-                                sx: {
-                                    bgcolor: "#F5E4C8", // Page background color
-                                    color: "#5b3f2a",
-                                    borderRadius: "20px",
-                                    border: "2px solid #5b3f2a"
-                                }
+                    {user ? (
+                        <>
+                            <MenuItem
+                                disableRipple
+                                sx={{
+                                    pointerEvents: "none",
+                                    "&:hover": { background: "transparent" },
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        width: "100%",
+                                        textAlign: "center",
+                                        py: 1,
+                                    }}
+                                >
+                                    <Box
+                                        component="img"
+                                        src={user.avatar}
+                                        alt={user.name}
+                                        sx={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: "50%",
+                                            mb: 1,
+                                        }}
+                                    />
+                                    <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                                        {user.name}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: 12, color: "#6B7280" }}>
+                                        {user.email}
+                                    </Typography>
+                                </Box>
+                            </MenuItem>
+
+                            <Box sx={{ px: 2, my: 1 }}>
+                                <Box sx={{ height: 1, bgcolor: "#E5E7EB" }} />
+                            </Box>
+
+                            <MenuItem
+                                onClick={handleLogout}
+                                sx={{
+                                    justifyContent: "center",
+                                    color: "#B91C1C",
+                                    fontWeight: 500,
+                                }}
+                            >
+                                Logout
+                            </MenuItem>
+                        </>
+                    ) : (
+                        <MenuItem
+                            disableRipple
+                            sx={{
+                                pt: 3,
+                                pb: 2,
+                                "&:hover": { background: "transparent" },
                             }}
                         >
-                            <DialogTitle sx={{ color: "#5b3f2a", fontWeight: "bold" }}>Start Voice Chat?</DialogTitle>
-                            <DialogContent>
-                                <DialogContentText sx={{ color: "#6e4c32" }}>
-                                    Do you want to start a continuous voice chat session with Luna?
-                                </DialogContentText>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button onClick={() => setVoiceModalOpen(false)} sx={{ color: "#5b3f2a" }}>Cancel</Button>
-                                <Button onClick={startVoiceMode} variant="contained" sx={{ bgcolor: "#5b3f2a", color: "white", borderRadius: "10px", "&:hover": { bgcolor: "#4a3322" } }}>
-                                    Start
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                            <Box sx={{ width: "100%" }}>
+                                <Typography
+                                    sx={{
+                                        mb: 2,
+                                        textAlign: "center",
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        color: "#374151",
+                                    }}
+                                >
+                                    Sign up
+                                </Typography>
 
-                        <InteractiveSvgAvatar
-                            maxOffsetPx={3}
-                            style={{
-                                width: isMobile ? 120 : 160,
-                                height: isMobile ? 120 : 160,
-                                marginTop: 24,
-                                marginBottom: 12,
+                                <Box
+                                    onClick={() => {
+                                        handleSignupClose();
+                                        window.location.href = `${API_BASE}/auth/google`;
+                                    }}
+                                    sx={{
+                                        width: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: 1.5,
+                                        py: 1.4,
+                                        px: 3,
+                                        borderRadius: "14px",
+                                        backgroundColor: "#F9FAFB",
+                                        color: "#111827",
+                                        border: "1px solid #E5E7EB",
+                                        cursor: "pointer",
+                                        "&:hover": {
+                                            backgroundColor: "#F3F4F6",
+                                        },
+                                    }}
+                                >
+                                    <Box
+                                        component="img"
+                                        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                        alt="Google"
+                                        sx={{ width: 20, height: 20 }}
+                                    />
+                                    <Typography sx={{ fontWeight: 500 }}>
+                                        Continue with Google
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </MenuItem>
+                    )}
+                </Menu>
+                <Box
+                    sx={{
+                        flex: 1,
+                        marginLeft: isMobile ? 0 : (collapsed ? "100px" : `${sidebarWidth}px`),
+                        height: "100vh",
+                        overflowY: "auto",
+                        overflowX: "hidden",
+                        transition: "margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                        pt: isMobile ? "72px" : 0, // Padding for mobile header
+                        // Masking to fade chats behind the transparent top nav
+                        ...(isMobile && {
+                            maskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
+                            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 100%)",
+                        })
+                    }}
+                >
+                    <Container
+                        maxWidth="lg"
+                        sx={{
+                            flex: 1,
+                            display: "flex",
+                            flexDirection: "column",
+                            px: isMobile ? 2 : 3,
+                            minHeight: "100%",
+                            position: "relative",
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                display: conversationMode ? "none" : "flex",
+                                flex: 1,
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                pt: conversationMode ? 0 : { xs: 0, md: 10 },
+                                transition: "opacity 320ms ease, transform 320ms ease",
+                                opacity: conversationMode ? 0 : 1,
+                                transform: conversationMode
+                                    ? "translateY(-10px) scale(0.99)"
+                                    : "none",
                             }}
-                        />
+                        >
+                            {/* --- Voice Chat Modal (Global) --- */}
+                            <Dialog
+                                open={voiceModalOpen}
+                                onClose={() => setVoiceModalOpen(false)}
+                                PaperProps={{
+                                    sx: {
+                                        bgcolor: "#F5E4C8", // Page background color
+                                        color: "#5b3f2a",
+                                        borderRadius: "20px",
+                                        border: "2px solid #5b3f2a"
+                                    }
+                                }}
+                            >
+                                <DialogTitle sx={{ color: "#5b3f2a", fontWeight: "bold" }}>Start Voice Chat?</DialogTitle>
+                                <DialogContent>
+                                    <DialogContentText sx={{ color: "#6e4c32" }}>
+                                        Do you want to start a continuous voice chat session with Luna?
+                                    </DialogContentText>
+                                </DialogContent>
+                                <DialogActions>
+                                    <Button onClick={() => setVoiceModalOpen(false)} sx={{ color: "#5b3f2a" }}>Cancel</Button>
+                                    <Button onClick={startVoiceMode} variant="contained" sx={{ bgcolor: "#5b3f2a", color: "white", borderRadius: "10px", "&:hover": { bgcolor: "#4a3322" } }}>
+                                        Start
+                                    </Button>
+                                </DialogActions>
+                            </Dialog>
 
-                        {isMobile ? (
-                            <>
+                            <InteractiveSvgAvatar
+                                maxOffsetPx={3}
+                                style={{
+                                    width: isMobile ? 120 : 160,
+                                    height: isMobile ? 120 : 160,
+                                    marginTop: 24,
+                                    marginBottom: 12,
+                                }}
+                            />
+
+                            {isMobile ? (
+                                <>
+                                    <Typography
+                                        variant="h6"
+                                        align="center"
+                                        sx={{
+                                            fontWeight: 600,
+                                            mb: 0.5,
+                                            color: ACCENT_DARK,
+                                            fontSize: "1.5rem",
+                                            px: 2,
+                                        }}
+                                    >
+                                        <TypingAnimation duration={100} delay={showLanding}>
+                                            Welcome to Luna
+                                        </TypingAnimation>
+                                    </Typography>
+
+                                    <Typography
+                                        align="center"
+                                        sx={{
+                                            fontWeight: 400,
+                                            mb: 2,
+                                            color: ACCENT_DARK,
+                                            fontSize: "1.05rem",
+                                        }}
+                                    >
+                                        Your Reflective AI Wellness Companion
+                                    </Typography>
+                                </>
+                            ) : (
+                                <Typography
+                                    variant="h4"
+                                    align="center"
+                                    sx={{
+                                        fontWeight: 600,
+                                        mb: 1,
+                                        lineHeight: 1.55,
+                                        color: ACCENT_DARK,
+                                        fontSize: { xs: "1.5rem", md: "2.125rem" },
+                                        px: 2,
+                                    }}
+                                >
+                                    <ScaleLetterText
+                                        text="Welcome to Luna"
+                                        delay={showLanding ? 0.5 : 0}
+                                    />
+                                    {" "}
+                                    <Box component="span" sx={{ fontWeight: 400 }}>
+                                        - Your Reflective AI Wellness Companion
+                                    </Box>
+                                </Typography>
+                            )}
+
+                            {!isMobile && (
                                 <Typography
                                     variant="h6"
                                     align="center"
                                     sx={{
-                                        fontWeight: 600,
-                                        mb: 0.5,
+                                        maxWidth: 900,
+                                        mb: 6,
+                                        fontWeight: 400,
                                         color: ACCENT_DARK,
-                                        fontSize: "1.5rem",
+                                        fontSize: { xs: "1rem", md: "1.25rem" },
                                         px: 2,
                                     }}
                                 >
-                                    <TypingAnimation duration={100} delay={showLanding}>
-                                        Welcome to Luna
-                                    </TypingAnimation>
+                                    I'm here to support your emotional health in any way I can
                                 </Typography>
+                            )}
 
-                                <Typography
-                                    align="center"
+
+                            <Box
+                                component="form"
+                                onSubmit={onSubmit}
+                                sx={{
+                                    width: "100%",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    mb: 4,
+                                    mt: { xs: 8, md: 0 },
+                                }}
+                            >
+                                <Box
                                     sx={{
-                                        fontWeight: 400,
-                                        mb: 2,
-                                        color: ACCENT_DARK,
-                                        fontSize: "1.05rem",
+                                        width: { xs: "100%", md: "74%" },
+                                        maxWidth: 1100,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 2,
                                     }}
                                 >
-                                    Your Reflective AI Wellness Companion
-                                </Typography>
-                            </>
-                        ) : (
-                            <Typography
-                                variant="h4"
-                                align="center"
-                                sx={{
-                                    fontWeight: 600,
-                                    mb: 1,
-                                    lineHeight: 1.55,
-                                    color: ACCENT_DARK,
-                                    fontSize: { xs: "1.5rem", md: "2.125rem" },
-                                    px: 2,
-                                }}
-                            >
-                                <ScaleLetterText
-                                    text="Welcome to Luna"
-                                    delay={showLanding ? 0.5 : 0}
-                                />
-                                {" "}
-                                <Box component="span" sx={{ fontWeight: 400 }}>
-                                    - Your Reflective AI Wellness Companion
-                                </Box>
-                            </Typography>
-                        )}
-
-                        {!isMobile && (
-                            <Typography
-                                variant="h6"
-                                align="center"
-                                sx={{
-                                    maxWidth: 900,
-                                    mb: 6,
-                                    fontWeight: 400,
-                                    color: ACCENT_DARK,
-                                    fontSize: { xs: "1rem", md: "1.25rem" },
-                                    px: 2,
-                                }}
-                            >
-                                I'm here to support your emotional health in any way I can
-                            </Typography>
-                        )}
-
-
-                        <Box
-                            component="form"
-                            onSubmit={onSubmit}
-                            sx={{
-                                width: "100%",
-                                display: "flex",
-                                justifyContent: "center",
-                                mb: 4,
-                                mt: { xs: 8, md: 0 },
-                            }}
-                        >
-                            <Box
-                                sx={{
-                                    width: { xs: "100%", md: "74%" },
-                                    maxWidth: 1100,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 2,
-                                }}
-                            >
-                                <Box sx={{ position: "relative", flex: 1 }}>
-                                    <TextField
-                                        value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={onKeyDown}
-                                        placeholder={isListening ? "" : "Start typing here..."}
-                                        multiline={false}
-                                        fullWidth
-                                        variant="filled"
-                                        InputProps={{
-                                            disableUnderline: true,
-                                            sx: {
-                                                height: 54,
-                                                borderRadius: "28px",
-                                                border: "1px solid #CAA361",
-                                                pr: isListening ? "110px" : "64px",
-                                                pl: 3,
-                                                bgcolor: INPUT_BG,
-                                                display: "flex",
-                                                alignItems: "center",
-                                                boxShadow: "inset 0 1px 0 rgba(0,0,0,0.02)",
-                                                "& .MuiInputBase-input": {
-                                                    height: "100%",
+                                    <Box sx={{ position: "relative", flex: 1 }}>
+                                        <TextField
+                                            value={input}
+                                            onChange={(e) => setInput(e.target.value)}
+                                            onKeyDown={onKeyDown}
+                                            placeholder={isListening ? "" : "Start typing here..."}
+                                            multiline={false}
+                                            fullWidth
+                                            variant="filled"
+                                            InputProps={{
+                                                disableUnderline: true,
+                                                sx: {
+                                                    height: 54,
+                                                    borderRadius: "28px",
+                                                    border: "1px solid #CAA361",
+                                                    pr: isListening ? "110px" : "64px",
+                                                    pl: 3,
+                                                    bgcolor: INPUT_BG,
                                                     display: "flex",
                                                     alignItems: "center",
-                                                    padding: 0,
-                                                    fontSize: 16,
-                                                    color: ACCENT_DARK,
+                                                    boxShadow: "inset 0 1px 0 rgba(0,0,0,0.02)",
+                                                    "& .MuiInputBase-input": {
+                                                        height: "100%",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        padding: 0,
+                                                        fontSize: 16,
+                                                        color: ACCENT_DARK,
+                                                    },
+                                                    "& .MuiInputBase-input.Mui-disabled": {
+                                                        opacity: 1,
+                                                        "-webkit-text-fill-color": ACCENT_DARK,
+                                                    },
+                                                    "& .MuiInputBase-input::placeholder":
+                                                    {
+                                                        color: "#8F7E63",
+                                                        opacity: 1,
+                                                    },
                                                 },
-                                                "& .MuiInputBase-input.Mui-disabled": {
-                                                    opacity: 1,
-                                                    "-webkit-text-fill-color": ACCENT_DARK,
-                                                },
-                                                "& .MuiInputBase-input::placeholder":
-                                                {
-                                                    color: "#8F7E63",
-                                                    opacity: 1,
-                                                },
-                                            },
-                                        }}
-                                        disabled={sending || isListening || inputDisabled}
-                                    />
-
-
-
-                                    {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
-
-
-
-                                    {/* MIC INSIDE FIELD (hero) */}
-                                    {/* Positioned at right: 58 (now left of voice button) */}
-                                    <IconButton
-                                        type="button"
-                                        aria-label="voice input"
-                                        onClick={handleMicClick}
-                                        sx={{
-                                            position: "absolute",
-                                            right: 58,
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            width: 36,
-                                            height: 36,
-                                            borderRadius: "50%",
-                                            bgcolor: "transparent",
-                                            boxShadow: "none",
-                                            p: 0,
-                                            "&:hover": { bgcolor: "transparent" },
-                                            display: isListening || voiceModeActive ? "none" : "inline-flex",
-                                        }}
-                                    >
-                                        <Box
-                                            component="svg"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            viewBox="0 0 24 24"
-                                            sx={{
-                                                width: 22,
-                                                height: 22,
-                                                stroke: isListening ? "#b52a2a" : "#503920",
-                                                strokeWidth: 1.4,
-                                                fill: "none",
                                             }}
-                                        >
-                                            <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
-                                            <path d="M19 11a7 7 0 0 1-14 0" />
-                                            <line x1="12" y1="17" x2="12" y2="21" />
-                                            <line x1="8" y1="21" x2="16" y2="21" />
-                                        </Box>
-                                    </IconButton>
+                                            disabled={sending || isListening || inputDisabled}
+                                        />
 
-                                    {/* --- VOICE CHAT BUTTON (Landing) --- */}
-                                    {/* Positioned at right: 14 (far right) */}
-                                    <Box
-                                        sx={{
-                                            position: "absolute",
-                                            right: 14,
-                                            top: "50%",
-                                            transform: "translateY(-50%)",
-                                            zIndex: 20,
-                                            transition: "all 0.3s ease"
-                                        }}
-                                    >
-                                        <Button
-                                            onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
-                                            variant="contained"
+
+
+                                        {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
+
+
+
+                                        {/* MIC INSIDE FIELD (hero) */}
+                                        {/* Positioned at right: 58 (now left of voice button) */}
+                                        <IconButton
+                                            type="button"
+                                            aria-label="voice input"
+                                            onClick={handleMicClick}
                                             sx={{
-                                                bgcolor: "#5b3f2a",
-                                                color: "white",
-                                                minWidth: voiceModeActive ? 120 : 36,
-                                                width: voiceModeActive ? "auto" : 36,
+                                                position: "absolute",
+                                                right: 58,
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                width: 36,
                                                 height: 36,
-                                                borderRadius: voiceModeActive ? "18px" : "50%",
-                                                p: 0,
-                                                px: voiceModeActive ? 2 : 0,
-                                                "&:hover": { bgcolor: "#4a3322" },
+                                                borderRadius: "50%",
+                                                bgcolor: "transparent",
                                                 boxShadow: "none",
-                                                display: (isListening && !voiceModeActive) ? "none" : "flex",
-                                                gap: 1
+                                                p: 0,
+                                                "&:hover": { bgcolor: "transparent" },
+                                                display: isListening || voiceModeActive ? "none" : "inline-flex",
                                             }}
                                         >
-                                            {voiceModeActive ? (
-                                                <>
-                                                    <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
-                                                    <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
-                                                </>
-                                            ) : (
-                                                <GraphicEqIcon sx={{ fontSize: 20 }} />
-                                            )}
-                                        </Button>
-                                        {voiceModeActive && (
-                                            <style>{`
+                                            <Box
+                                                component="svg"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                viewBox="0 0 24 24"
+                                                sx={{
+                                                    width: 22,
+                                                    height: 22,
+                                                    stroke: isListening ? "#b52a2a" : "#503920",
+                                                    strokeWidth: 1.4,
+                                                    fill: "none",
+                                                }}
+                                            >
+                                                <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
+                                                <path d="M19 11a7 7 0 0 1-14 0" />
+                                                <line x1="12" y1="17" x2="12" y2="21" />
+                                                <line x1="8" y1="21" x2="16" y2="21" />
+                                            </Box>
+                                        </IconButton>
+
+                                        {/* --- VOICE CHAT BUTTON (Landing) --- */}
+                                        {/* Positioned at right: 14 (far right) */}
+                                        <Box
+                                            sx={{
+                                                position: "absolute",
+                                                right: 14,
+                                                top: "50%",
+                                                transform: "translateY(-50%)",
+                                                zIndex: 20,
+                                                transition: "all 0.3s ease"
+                                            }}
+                                        >
+                                            <Button
+                                                onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
+                                                variant="contained"
+                                                sx={{
+                                                    bgcolor: "#5b3f2a",
+                                                    color: "white",
+                                                    minWidth: voiceModeActive ? 120 : 36,
+                                                    width: voiceModeActive ? "auto" : 36,
+                                                    height: 36,
+                                                    borderRadius: voiceModeActive ? "18px" : "50%",
+                                                    p: 0,
+                                                    px: voiceModeActive ? 2 : 0,
+                                                    "&:hover": { bgcolor: "#4a3322" },
+                                                    boxShadow: "none",
+                                                    display: (isListening && !voiceModeActive) ? "none" : "flex",
+                                                    gap: 1
+                                                }}
+                                            >
+                                                {voiceModeActive ? (
+                                                    <>
+                                                        <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                        <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
+                                                    </>
+                                                ) : (
+                                                    <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                                )}
+                                            </Button>
+                                            {voiceModeActive && (
+                                                <style>{`
                                                 @keyframes float {
                                                     0% { transform: translateY(0px); }
                                                     50% { transform: translateY(-3px); }
                                                     100% { transform: translateY(0px); }
                                                 }
                                             `}</style>
-                                        )}
+                                            )}
+                                        </Box>
+                                    </Box>
+
+                                    <Box
+                                        component="button"
+                                        type="submit"
+                                        aria-label="send message"
+                                        disabled={sending || !input.trim()}
+                                        sx={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: "50%",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            border: "1px solid #CAA361",
+                                            backgroundColor: INPUT_BG,
+                                            cursor:
+                                                input.trim() && !sending
+                                                    ? "pointer"
+                                                    : "default",
+                                            transition: "0.15s",
+                                            "&:hover": {
+                                                transform: input.trim()
+                                                    ? "scale(1.05)"
+                                                    : "none",
+                                            },
+                                            "&:disabled": {
+                                                opacity: 0.6,
+                                                cursor: "default",
+                                                transform: "none",
+                                            },
+                                        }}
+                                    >
+                                        <Box
+                                            component="img"
+                                            src={SendIcon}
+                                            alt="send icon"
+                                            sx={{
+                                                width: 22,
+                                                height: 22,
+                                                objectFit: "contain",
+                                            }}
+                                        />
                                     </Box>
                                 </Box>
-
-                                <Box
-                                    component="button"
-                                    type="submit"
-                                    aria-label="send message"
-                                    disabled={sending || !input.trim()}
-                                    sx={{
-                                        width: 48,
-                                        height: 48,
-                                        borderRadius: "50%",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        border: "1px solid #CAA361",
-                                        backgroundColor: INPUT_BG,
-                                        cursor:
-                                            input.trim() && !sending
-                                                ? "pointer"
-                                                : "default",
-                                        transition: "0.15s",
-                                        "&:hover": {
-                                            transform: input.trim()
-                                                ? "scale(1.05)"
-                                                : "none",
-                                        },
-                                        "&:disabled": {
-                                            opacity: 0.6,
-                                            cursor: "default",
-                                            transform: "none",
-                                        },
-                                    }}
-                                >
-                                    <Box
-                                        component="img"
-                                        src={SendIcon}
-                                        alt="send icon"
-                                        sx={{
-                                            width: 22,
-                                            height: 22,
-                                            objectFit: "contain",
-                                        }}
-                                    />
-                                </Box>
                             </Box>
+                            {!isMobile && (
+                                <>
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            textAlign: "center",
+                                            fontStyle: "italic",
+                                            mb: 2,
+                                            color: "#4E351A",
+                                            fontFamily: "Poppins",
+                                            fontSize: 14,
+                                        }}
+                                    >
+                                        What people talk about most.
+                                    </Typography>
+
+
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            gap: 2,
+                                            justifyContent: "center",
+                                            mt: 1,
+                                        }}
+                                    >
+                                        {quickTopics.slice(0, 3).map((t) => (
+                                            <Chip
+                                                key={t}
+                                                label={t}
+                                                onClick={() => setInput(t)}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 99,
+                                                    borderColor: "#9E7F49",
+                                                    background: "transparent",
+                                                    color: "rgba(80, 57, 32, 0.6)",
+                                                    px: 3,
+                                                    minWidth: 140,
+                                                    "& .MuiChip-label": {
+                                                        py: 0.7,
+                                                        fontSize: 14,
+                                                        fontFamily: "Poppins",
+                                                    },
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            gap: 2,
+                                            justifyContent: "center",
+                                            mt: 2,
+                                        }}
+                                    >
+                                        {quickTopics.slice(3, 5).map((t) => (
+                                            <Chip
+                                                key={t}
+                                                label={t}
+                                                onClick={() => setInput(t)}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 99,
+                                                    borderColor: "#9E7F49",
+                                                    background: "transparent",
+                                                    color: "rgba(80, 57, 32, 0.6)",
+                                                    px: 3,
+                                                    minWidth: 140,
+                                                    "& .MuiChip-label": {
+                                                        py: 0.7,
+                                                        fontSize: 14,
+                                                        fontFamily: "Poppins",
+                                                    },
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+
+
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            mt: 6,
+                                            color: "#826840",
+                                            fontSize: 16,
+                                            fontWeight: 300,
+                                        }}
+                                    >
+                                        Disclaimer: Luna offers support, not medical care.
+                                        Always consult a professional.
+                                    </Typography>
+                                </>
+                            )}
+
                         </Box>
-                        {!isMobile && (
-                            <>
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        textAlign: "center",
-                                        fontStyle: "italic",
-                                        mb: 2,
-                                        color: "#4E351A",
-                                        fontFamily: "Poppins",
-                                        fontSize: 14,
-                                    }}
-                                >
-                                    What people talk about most.
-                                </Typography>
 
-
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        gap: 2,
-                                        justifyContent: "center",
-                                        mt: 1,
-                                    }}
-                                >
-                                    {quickTopics.slice(0, 3).map((t) => (
-                                        <Chip
-                                            key={t}
-                                            label={t}
-                                            onClick={() => setInput(t)}
-                                            variant="outlined"
-                                            sx={{
-                                                borderRadius: 99,
-                                                borderColor: "#9E7F49",
-                                                background: "transparent",
-                                                color: "rgba(80, 57, 32, 0.6)",
-                                                px: 3,
-                                                minWidth: 140,
-                                                "& .MuiChip-label": {
-                                                    py: 0.7,
-                                                    fontSize: 14,
-                                                    fontFamily: "Poppins",
-                                                },
-                                            }}
-                                        />
-                                    ))}
-                                </Box>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        gap: 2,
-                                        justifyContent: "center",
-                                        mt: 2,
-                                    }}
-                                >
-                                    {quickTopics.slice(3, 5).map((t) => (
-                                        <Chip
-                                            key={t}
-                                            label={t}
-                                            onClick={() => setInput(t)}
-                                            variant="outlined"
-                                            sx={{
-                                                borderRadius: 99,
-                                                borderColor: "#9E7F49",
-                                                background: "transparent",
-                                                color: "rgba(80, 57, 32, 0.6)",
-                                                px: 3,
-                                                minWidth: 140,
-                                                "& .MuiChip-label": {
-                                                    py: 0.7,
-                                                    fontSize: 14,
-                                                    fontFamily: "Poppins",
-                                                },
-                                            }}
-                                        />
-                                    ))}
-                                </Box>
-
-
+                        {isMobile && !conversationMode && (
+                            <Box sx={{ mt: "auto", pb: 3, width: "100%" }}>
                                 <Typography
                                     variant="caption"
+                                    align="center"
                                     sx={{
-                                        mt: 6,
-                                        color: "#826840",
-                                        fontSize: 16,
-                                        fontWeight: 300,
+                                        color: "rgba(80, 57, 32, 0.5)",
+                                        px: 4,
+                                        fontSize: 14,
+                                        fontWeight: 100,
+                                        display: "block",
+                                        textAlign: "center"
                                     }}
                                 >
                                     Disclaimer: Luna offers support, not medical care.
                                     Always consult a professional.
                                 </Typography>
-                            </>
+                            </Box>
                         )}
 
-                    </Box>
-
-                    {isMobile && !conversationMode && (
-                        <Box sx={{ mt: "auto", pb: 3, width: "100%" }}>
-                            <Typography
-                                variant="caption"
-                                align="center"
-                                sx={{
-                                    color: "rgba(80, 57, 32, 0.5)",
-                                    px: 4,
-                                    fontSize: 14,
-                                    fontWeight: 100,
-                                    display: "block",
-                                    textAlign: "center"
-                                }}
-                            >
-                                Disclaimer: Luna offers support, not medical care.
-                                Always consult a professional.
-                            </Typography>
-                        </Box>
-                    )}
-
-                    {/* Conversation view */}
-                    {conversationMode && (
-                        <Box
-                            sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                minHeight: "100vh",
-                                pt: { xs: 8, md: 6 },
-                                pb: 2,
-                            }}
-                        >
-                            <Box sx={{ flex: 1, pb: 2 }}>
-                                <Box
-                                    sx={{
-                                        maxWidth: 900,
-                                        mx: "auto",
-                                        py: 2,
-                                    }}
-                                >
-                                    {messages.map((m) => (
-                                        <Box
-                                            key={m.id}
-                                            sx={{
-                                                mb: 2,
-                                                display: "flex",
-                                                gap: 1,
-                                                alignItems: "flex-start",
-                                                justifyContent:
-                                                    m.from === "user"
-                                                        ? "flex-end"
-                                                        : "flex-start",
-                                            }}
-                                        >
-                                            {m.from === "bot" ? (
-                                                <>
-                                                    <Box
-                                                        sx={{
-                                                            width: 40,
-                                                            height: 40,
-                                                            flexShrink: 0,
-                                                        }}
-                                                    >
-                                                        <InteractiveSvgAvatar
-                                                            keepEyesClosed={true}
-                                                            maxOffsetPx={3}
-                                                            style={{
-                                                                width: 40,
-                                                                height: 40,
-                                                                marginTop: 0,
-                                                                marginBottom: 0,
-                                                            }}
-                                                        />
-                                                    </Box>
-                                                    <Paper
-                                                        elevation={0}
-                                                        sx={{
-                                                            p: 1.2,
-                                                            px: 2,
-                                                            borderRadius: 2,
-                                                            backgroundColor:
-                                                                PAPER_BG,
-                                                            color: ACCENT_DARK,
-                                                            maxWidth: "80%",
-                                                            whiteSpace:
-                                                                "pre-wrap",
-                                                        }}
-                                                    >
-                                                        <Typography
-                                                            variant="body1"
-                                                            sx={{
-                                                                color: ACCENT_DARK,
-                                                            }}
-                                                        >
-                                                            {m.text}
-                                                        </Typography>
-                                                    </Paper>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Paper
-                                                        elevation={0}
-                                                        sx={{
-                                                            p: 1.2,
-                                                            px: 2,
-                                                            borderRadius: 2,
-                                                            backgroundColor:
-                                                                "#fff",
-                                                            color: ACCENT_DARK,
-                                                            maxWidth: "80%",
-                                                            whiteSpace:
-                                                                "pre-wrap",
-                                                        }}
-                                                    >
-                                                        <Typography
-                                                            variant="body1"
-                                                            sx={{
-                                                                color: ACCENT_DARK,
-                                                            }}
-                                                        >
-                                                            {m.text}
-                                                        </Typography>
-                                                    </Paper>
-                                                </>
-                                            )}
-                                        </Box>
-                                    ))}
-
-
-                                    {sending && (
-                                        <Box
-                                            sx={{
-                                                mb: 2,
-                                                display: "flex",
-                                                gap: 1,
-                                                alignItems: "flex-start",
-                                            }}
-                                        >
-                                            <Box
-                                                sx={{
-                                                    width: 40,
-                                                    height: 40,
-                                                    flexShrink: 0,
-                                                }}
-                                            >
-                                                <InteractiveSvgAvatar
-                                                    keepEyesClosed={true}
-                                                    maxOffsetPx={3}
-                                                    style={{
-                                                        width: 40,
-                                                        height: 40,
-                                                        marginTop: 0,
-                                                        marginBottom: 0,
-                                                    }}
-                                                />
-                                            </Box>
-                                            <Box sx={{ mt: 0.3 }}>
-                                                <TypingIndicator
-                                                    bg={INPUT_BG}
-                                                    color={ACCENT_DARK}
-                                                />
-                                            </Box>
-                                        </Box>
-                                    )}
-
-                                    <div ref={messagesEndRef} />
-                                </Box>
-                            </Box>
-
-                            {/* Input bar (sticky) */}
+                        {/* Conversation view */}
+                        {conversationMode && (
                             <Box
-                                component="form"
-                                onSubmit={onSubmit}
                                 sx={{
-                                    borderTop: 1,
-                                    borderColor: "rgba(0,0,0,0.08)",
-                                    pt: 2,
-                                    pb: 0.5,
-                                    position: "sticky",
-                                    bottom: 0,
-                                    background: BG_GRADIENT,
-                                    backgroundAttachment: "fixed",
-                                    zIndex: 100,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    minHeight: "100vh",
+                                    pt: { xs: 8, md: 6 },
+                                    pb: 2,
                                 }}
                             >
-                                <Container maxWidth="lg">
+                                <Box sx={{ flex: 1, pb: 2 }}>
                                     <Box
                                         sx={{
-                                            width: { xs: "100%", md: "74%" },
-                                            maxWidth: 1100,
+                                            maxWidth: 900,
                                             mx: "auto",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 2,
+                                            py: 2,
                                         }}
                                     >
-                                        <Box
-                                            sx={{
-                                                position: "relative",
-                                                flex: 1,
-                                            }}
-                                        >
-                                            <TextField
-                                                value={input}
-                                                onChange={(e) =>
-                                                    setInput(e.target.value)
-                                                }
-                                                onKeyDown={onKeyDown}
-                                                placeholder="Send a message..."
-                                                multiline
-                                                minRows={1}
-                                                maxRows={6}
-                                                fullWidth
-                                                variant="filled"
-                                                InputProps={{
-                                                    disableUnderline: true,
-                                                    sx: {
-                                                        borderRadius: "18px",
-                                                        pr: "64px",
-                                                        pl: 3,
-                                                        bgcolor: INPUT_BG,
-                                                        paddingY: "14px",
-                                                        "& .MuiInputBase-input":
-                                                        {
-                                                            fontSize: 16,
-                                                            lineHeight: 1.6,
-                                                            color: ACCENT_DARK,
-                                                        },
-                                                    },
-                                                }}
-                                                disabled={sending}
-                                            />
-
-
-
-                                            {/* MIC INSIDE FIELD (conversation) */}
-                                            {/* Left of voice button (58px) */}
-                                            <IconButton
-                                                type="button"
-                                                aria-label="voice input"
-                                                onClick={handleMicClick}
+                                        {messages.map((m) => (
+                                            <Box
+                                                key={m.id}
                                                 sx={{
-                                                    position: "absolute",
-                                                    right: 58,
-                                                    top: "50%",
-                                                    transform: "translateY(-50%)",
-                                                    width: 36,
-                                                    height: 36,
-                                                    borderRadius: "50%",
-                                                    bgcolor: "transparent",
-                                                    boxShadow: "none",
-                                                    p: 0,
-                                                    "&:hover": { bgcolor: "transparent" },
-                                                    opacity: isListening ? 1 : 0.9,
-                                                    display: isListening || voiceModeActive ? "none" : "inline-flex"
+                                                    mb: 2,
+                                                    display: "flex",
+                                                    gap: 1,
+                                                    alignItems: "flex-start",
+                                                    justifyContent:
+                                                        m.from === "user"
+                                                            ? "flex-end"
+                                                            : "flex-start",
+                                                }}
+                                            >
+                                                {m.from === "bot" ? (
+                                                    <>
+                                                        <Box
+                                                            sx={{
+                                                                width: 40,
+                                                                height: 40,
+                                                                flexShrink: 0,
+                                                            }}
+                                                        >
+                                                            <InteractiveSvgAvatar
+                                                                keepEyesClosed={true}
+                                                                maxOffsetPx={3}
+                                                                style={{
+                                                                    width: 40,
+                                                                    height: 40,
+                                                                    marginTop: 0,
+                                                                    marginBottom: 0,
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                        <Paper
+                                                            elevation={0}
+                                                            sx={{
+                                                                p: 1.2,
+                                                                px: 2,
+                                                                borderRadius: 2,
+                                                                backgroundColor:
+                                                                    PAPER_BG,
+                                                                color: ACCENT_DARK,
+                                                                maxWidth: "80%",
+                                                                whiteSpace:
+                                                                    "pre-wrap",
+                                                            }}
+                                                        >
+                                                            <Typography
+                                                                variant="body1"
+                                                                sx={{
+                                                                    color: ACCENT_DARK,
+                                                                }}
+                                                            >
+                                                                {m.text}
+                                                            </Typography>
+                                                        </Paper>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Paper
+                                                            elevation={0}
+                                                            sx={{
+                                                                p: 1.2,
+                                                                px: 2,
+                                                                borderRadius: 2,
+                                                                backgroundColor:
+                                                                    "#fff",
+                                                                color: ACCENT_DARK,
+                                                                maxWidth: "80%",
+                                                                whiteSpace:
+                                                                    "pre-wrap",
+                                                            }}
+                                                        >
+                                                            <Typography
+                                                                variant="body1"
+                                                                sx={{
+                                                                    color: ACCENT_DARK,
+                                                                }}
+                                                            >
+                                                                {m.text}
+                                                            </Typography>
+                                                        </Paper>
+                                                    </>
+                                                )}
+                                            </Box>
+                                        ))}
+
+
+                                        {sending && (
+                                            <Box
+                                                sx={{
+                                                    mb: 2,
+                                                    display: "flex",
+                                                    gap: 1,
+                                                    alignItems: "flex-start",
                                                 }}
                                             >
                                                 <Box
-                                                    component="svg"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 24 24"
                                                     sx={{
-                                                        width: 22,
-                                                        height: 22,
-                                                        stroke: isListening ? "#b52a2a" : "#503920",
-                                                        strokeWidth: 1.4,
-                                                        fill: "none",
-                                                        display: "block",
+                                                        width: 40,
+                                                        height: 40,
+                                                        flexShrink: 0,
                                                     }}
                                                 >
-                                                    <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
-                                                    <path d="M19 11a7 7 0 0 1-14 0" />
-                                                    <line x1="12" y1="17" x2="12" y2="21" />
-                                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                                    <InteractiveSvgAvatar
+                                                        keepEyesClosed={true}
+                                                        maxOffsetPx={3}
+                                                        style={{
+                                                            width: 40,
+                                                            height: 40,
+                                                            marginTop: 0,
+                                                            marginBottom: 0,
+                                                        }}
+                                                    />
                                                 </Box>
-                                            </IconButton>
+                                                <Box sx={{ mt: 0.3 }}>
+                                                    <TypingIndicator
+                                                        bg={INPUT_BG}
+                                                        color={ACCENT_DARK}
+                                                    />
+                                                </Box>
+                                            </Box>
+                                        )}
 
-                                            {/* --- VOICE CHAT BUTTON (New) --- */}
-                                            {/* Rightmost (14px) */}
+                                        <div ref={messagesEndRef} />
+                                    </Box>
+                                </Box>
+
+                                {/* Input bar (sticky) */}
+                                <Box
+                                    component="form"
+                                    onSubmit={onSubmit}
+                                    sx={{
+                                        borderTop: 1,
+                                        borderColor: "rgba(0,0,0,0.08)",
+                                        pt: 2,
+                                        pb: 0.5,
+                                        position: "sticky",
+                                        bottom: 0,
+                                        background: BG_GRADIENT,
+                                        backgroundAttachment: "fixed",
+                                        zIndex: 100,
+                                    }}
+                                >
+                                    <Container maxWidth="lg">
+                                        <Box
+                                            sx={{
+                                                width: { xs: "100%", md: "74%" },
+                                                maxWidth: 1100,
+                                                mx: "auto",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 2,
+                                            }}
+                                        >
                                             <Box
                                                 sx={{
-                                                    position: "absolute",
-                                                    right: 14,
-                                                    top: "50%",
-                                                    transform: "translateY(-50%)",
-                                                    zIndex: 20,
-                                                    transition: "all 0.3s ease"
+                                                    position: "relative",
+                                                    flex: 1,
                                                 }}
                                             >
-                                                <Button
-                                                    onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
-                                                    variant="contained"
+                                                <TextField
+                                                    value={input}
+                                                    onChange={(e) =>
+                                                        setInput(e.target.value)
+                                                    }
+                                                    onKeyDown={onKeyDown}
+                                                    placeholder="Send a message..."
+                                                    multiline
+                                                    minRows={1}
+                                                    maxRows={6}
+                                                    fullWidth
+                                                    variant="filled"
+                                                    InputProps={{
+                                                        disableUnderline: true,
+                                                        sx: {
+                                                            borderRadius: "18px",
+                                                            pr: "64px",
+                                                            pl: 3,
+                                                            bgcolor: INPUT_BG,
+                                                            paddingY: "14px",
+                                                            "& .MuiInputBase-input":
+                                                            {
+                                                                fontSize: 16,
+                                                                lineHeight: 1.6,
+                                                                color: ACCENT_DARK,
+                                                            },
+                                                        },
+                                                    }}
+                                                    disabled={sending}
+                                                />
+
+
+
+                                                {/* MIC INSIDE FIELD (conversation) */}
+                                                {/* Left of voice button (58px) */}
+                                                <IconButton
+                                                    type="button"
+                                                    aria-label="voice input"
+                                                    onClick={handleMicClick}
                                                     sx={{
-                                                        bgcolor: "#5b3f2a",
-                                                        color: "white",
-                                                        minWidth: voiceModeActive ? 120 : 36,
-                                                        width: voiceModeActive ? "auto" : 36,
+                                                        position: "absolute",
+                                                        right: 58,
+                                                        top: "50%",
+                                                        transform: "translateY(-50%)",
+                                                        width: 36,
                                                         height: 36,
-                                                        borderRadius: voiceModeActive ? "18px" : "50%",
-                                                        p: 0,
-                                                        px: voiceModeActive ? 2 : 0,
-                                                        "&:hover": { bgcolor: "#4a3322" },
+                                                        borderRadius: "50%",
+                                                        bgcolor: "transparent",
                                                         boxShadow: "none",
-                                                        display: (isListening && !voiceModeActive) ? "none" : "flex",
-                                                        gap: 1
+                                                        p: 0,
+                                                        "&:hover": { bgcolor: "transparent" },
+                                                        opacity: isListening ? 1 : 0.9,
+                                                        display: isListening || voiceModeActive ? "none" : "inline-flex"
                                                     }}
                                                 >
-                                                    {voiceModeActive ? (
-                                                        <>
-                                                            <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
-                                                            <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
-                                                        </>
-                                                    ) : (
-                                                        <GraphicEqIcon sx={{ fontSize: 20 }} />
-                                                    )}
-                                                </Button>
-                                                {voiceModeActive && (
-                                                    <style>{`
+                                                    <Box
+                                                        component="svg"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 24 24"
+                                                        sx={{
+                                                            width: 22,
+                                                            height: 22,
+                                                            stroke: isListening ? "#b52a2a" : "#503920",
+                                                            strokeWidth: 1.4,
+                                                            fill: "none",
+                                                            display: "block",
+                                                        }}
+                                                    >
+                                                        <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
+                                                        <path d="M19 11a7 7 0 0 1-14 0" />
+                                                        <line x1="12" y1="17" x2="12" y2="21" />
+                                                        <line x1="8" y1="21" x2="16" y2="21" />
+                                                    </Box>
+                                                </IconButton>
+
+                                                {/* --- VOICE CHAT BUTTON (New) --- */}
+                                                {/* Rightmost (14px) */}
+                                                <Box
+                                                    sx={{
+                                                        position: "absolute",
+                                                        right: 14,
+                                                        top: "50%",
+                                                        transform: "translateY(-50%)",
+                                                        zIndex: 20,
+                                                        transition: "all 0.3s ease"
+                                                    }}
+                                                >
+                                                    <Button
+                                                        onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
+                                                        variant="contained"
+                                                        sx={{
+                                                            bgcolor: "#5b3f2a",
+                                                            color: "white",
+                                                            minWidth: voiceModeActive ? 120 : 36,
+                                                            width: voiceModeActive ? "auto" : 36,
+                                                            height: 36,
+                                                            borderRadius: voiceModeActive ? "18px" : "50%",
+                                                            p: 0,
+                                                            px: voiceModeActive ? 2 : 0,
+                                                            "&:hover": { bgcolor: "#4a3322" },
+                                                            boxShadow: "none",
+                                                            display: (isListening && !voiceModeActive) ? "none" : "flex",
+                                                            gap: 1
+                                                        }}
+                                                    >
+                                                        {voiceModeActive ? (
+                                                            <>
+                                                                <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                                <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
+                                                            </>
+                                                        ) : (
+                                                            <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                                        )}
+                                                    </Button>
+                                                    {voiceModeActive && (
+                                                        <style>{`
                                                         @keyframes float {
                                                             0% { transform: translateY(0px); }
                                                             50% { transform: translateY(-3px); }
                                                             100% { transform: translateY(0px); }
                                                         }
                                                     `}</style>
-                                                )}
+                                                    )}
+                                                </Box>
+
+                                                {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
                                             </Box>
 
-                                            {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
+                                            <Box
+                                                component="button"
+                                                type="submit"
+                                                aria-label="send message"
+                                                disabled={sending || !input.trim()}
+                                                sx={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    borderRadius: "50%",
+                                                    display: "inline-flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    border: "1px solid #CAA361",
+                                                    backgroundColor: INPUT_BG,
+                                                    cursor:
+                                                        input.trim() && !sending
+                                                            ? "pointer"
+                                                            : "default",
+                                                    transition: "0.15s",
+                                                    "&:hover": {
+                                                        transform: input.trim()
+                                                            ? "scale(1.05)"
+                                                            : "none",
+                                                    },
+                                                    "&:disabled": {
+                                                        opacity: 0.6,
+                                                        cursor: "default",
+                                                        transform: "none",
+                                                    },
+                                                }}
+                                            >
+                                                <Box
+                                                    component="img"
+                                                    src={SendIcon}
+                                                    alt="send icon"
+                                                    sx={{
+                                                        width: 22,
+                                                        height: 22,
+                                                        objectFit: "contain",
+                                                    }}
+                                                />
+                                            </Box>
                                         </Box>
-
-                                        <Box
-                                            component="button"
-                                            type="submit"
-                                            aria-label="send message"
-                                            disabled={sending || !input.trim()}
+                                        <Typography
+                                            variant="caption"
+                                            align="center"
                                             sx={{
-                                                width: 48,
-                                                height: 48,
-                                                borderRadius: "50%",
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                border: "1px solid #CAA361",
-                                                backgroundColor: INPUT_BG,
-                                                cursor:
-                                                    input.trim() && !sending
-                                                        ? "pointer"
-                                                        : "default",
-                                                transition: "0.15s",
-                                                "&:hover": {
-                                                    transform: input.trim()
-                                                        ? "scale(1.05)"
-                                                        : "none",
-                                                },
-                                                "&:disabled": {
-                                                    opacity: 0.6,
-                                                    cursor: "default",
-                                                    transform: "none",
-                                                },
+                                                color: "rgba(80, 57, 32, 0.8)",
+                                                fontSize: 12,
+                                                fontWeight: 400,
+                                                display: "block",
+                                                textAlign: "center",
+                                                mt: 1.5,
+                                                width: "100%",
                                             }}
                                         >
-                                            <Box
-                                                component="img"
-                                                src={SendIcon}
-                                                alt="send icon"
-                                                sx={{
-                                                    width: 22,
-                                                    height: 22,
-                                                    objectFit: "contain",
-                                                }}
-                                            />
-                                        </Box>
-                                    </Box>
-                                    <Typography
-                                        variant="caption"
-                                        align="center"
-                                        sx={{
-                                            color: "rgba(80, 57, 32, 0.8)",
-                                            fontSize: 12,
-                                            fontWeight: 400,
-                                            display: "block",
-                                            textAlign: "center",
-                                            mt: 1.5,
-                                            width: "100%",
-                                        }}
-                                    >
-                                        Disclaimer: Luna offers support, not medical care. Always consult a professional.
-                                    </Typography>
-                                </Container>
+                                            Disclaimer: Luna offers support, not medical care. Always consult a professional.
+                                        </Typography>
+                                    </Container>
+                                </Box>
                             </Box>
-                        </Box>
-                    )}
-                </Container>
-            </Box>
-            <Dialog
-                open={deleteDialogOpen}
-                onClose={() => setDeleteDialogOpen(false)}
-                PaperProps={{
-                    sx: {
-                        borderRadius: "20px",
-                        bgcolor: PAPER_BG,
-                        p: 1
-                    }
-                }}
-            >
-                <DialogTitle sx={{ color: ACCENT_DARK, fontWeight: 700 }}>
-                    Delete History?
-                </DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ color: "rgba(43, 26, 17, 0.7)" }}>
-                        Are you sure you want to delete this chat history? This action cannot be undone.
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button
-                        onClick={() => setDeleteDialogOpen(false)}
-                        sx={{ color: "rgba(43, 26, 17, 0.5)", textTransform: 'none' }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleConfirmDelete}
-                        variant="contained"
-                        sx={{
-                            bgcolor: "#ff6b6b",
-                            color: "#fff",
-                            borderRadius: "10px",
-                            textTransform: 'none',
-                            "&:hover": { bgcolor: "#ff5252" }
-                        }}
-                    >
-                        Delete
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        </Box >
+                        )}
+                    </Container>
+                </Box>
+                <Dialog
+                    open={deleteDialogOpen}
+                    onClose={() => setDeleteDialogOpen(false)}
+                    PaperProps={{
+                        sx: {
+                            borderRadius: "20px",
+                            bgcolor: PAPER_BG,
+                            p: 1
+                        }
+                    }}
+                >
+                    <DialogTitle sx={{ color: ACCENT_DARK, fontWeight: 700 }}>
+                        Delete History?
+                    </DialogTitle>
+                    <DialogContent>
+                        <DialogContentText sx={{ color: "rgba(43, 26, 17, 0.7)" }}>
+                            Are you sure you want to delete this chat history? This action cannot be undone.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button
+                            onClick={() => setDeleteDialogOpen(false)}
+                            sx={{ color: "rgba(43, 26, 17, 0.5)", textTransform: 'none' }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleConfirmDelete}
+                            variant="contained"
+                            sx={{
+                                bgcolor: "#ff6b6b",
+                                color: "#fff",
+                                borderRadius: "10px",
+                                textTransform: 'none',
+                                "&:hover": { bgcolor: "#ff5252" }
+                            }}
+                        >
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            </Box >
+            );
+        </>
     );
 }
