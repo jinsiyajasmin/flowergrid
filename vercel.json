@@ -26,11 +26,11 @@
             "destination": "/api/index.js"
         },
         {
-            "source": "/admin",
+            "source": "/dashboard",
             "destination": "/index.html"
         },
         {
-            "source": "/admin/(.*)",
+            "source": "/dashboard/(.*)",
             "destination": "/index.html"
         },
         {
