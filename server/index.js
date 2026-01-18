@@ -26,16 +26,13 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
+  'https://flowergrid.vercel.app',
   'http://localhost:5173',
-
-  'http://localhost:4000',
-
-  'https://flowergrid.vercel.app'
+  'http://localhost:4000'
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -51,7 +48,6 @@ app.use(cors({
 app.get('/health', (req, res) => res.json({ status: "alive" }));
 app.get('/', (req, res) => res.send("FlowerGrid API is running"));
 
-// Log all requests for debugging
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.url}`);
   next();
@@ -67,7 +63,7 @@ app.use(
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      maxAge: 24 * 60 * 60 * 1000,
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     }
   })
@@ -75,7 +71,6 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
-
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -97,7 +92,6 @@ async function initializeApp() {
   isInitialized = true;
 }
 
-// Middleware to ensure DB and KB are ready
 app.use(async (req, res, next) => {
   try {
     await initializeApp();
@@ -113,7 +107,7 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "https://flowergrid-7mw2.vercel.app/auth/google/callback",
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:4000/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {

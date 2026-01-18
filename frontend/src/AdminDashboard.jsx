@@ -25,10 +25,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import SearchIcon from "@mui/icons-material/Search";
+import Visibility from "@mui/icons-material/Visibility";
+import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
 import flowerGridLogo from "../assets/flower.png";
 import PeopleIcon from "../assets/none.png";
+import AnimatedDashboardIcon from "./components/AnimatedDashboardIcon";
 
 
 
@@ -43,6 +46,7 @@ export default function AdminDashboard() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [error, setError] = useState("");
 
@@ -183,13 +187,27 @@ export default function AdminDashboard() {
                   },
                 }}
               />
+
               <TextField
                 fullWidth
                 variant="outlined"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={() => setShowPassword(!showPassword)}
+                        edge="end"
+                        sx={{ color: "#8B7355" }}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
                 sx={{
                   mb: 2,
                   bgcolor: "#F5F1E8",
@@ -240,7 +258,9 @@ export default function AdminDashboard() {
           width: 200,
           bgcolor: "#6B4A2A",
           color: "white",
-          p: 4,
+          py: 4,
+          pl: 4,
+          pr: 0, // No padding on right so the item connects
           display: "flex",
           flexDirection: "column",
         }}>
@@ -270,30 +290,26 @@ export default function AdminDashboard() {
 
 
           <Box sx={{
-            bgcolor: "#F5E4C8",
+            bgcolor: "#F5E4C8", // This matches the main content background
             color: "#6B4A2A",
-            borderRadius: 2,
+            borderTopLeftRadius: 15,
+            borderBottomLeftRadius: 15,
             p: 2,
             display: "flex",
             alignItems: "center",
             gap: 2,
-            width: 400,
+            width: "100%", // Use full width of container
+            // "Merged" look: removing right padding/margin effectively
+            position: "relative",
+            left: 4, // Slight offset to ensure overlap with main content area if needed, or just 0
+            boxShadow: "none"
           }}>
-            <Box sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: 0.5,
-              fontSize: 24,
-            }}>
-              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
-              <Box sx={{ width: 8, height: 8, bgcolor: "#6B5744", borderRadius: 0.5 }} />
-            </Box>
+            <AnimatedDashboardIcon size={24} color="#6B4A2A" />
             <Typography fontWeight={500}>Dashboard</Typography>
           </Box>
         </Box>
-      )}
+      )
+      }
 
       <Box sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
         <Box sx={{ maxWidth: 1400, mx: "auto" }}>
@@ -308,7 +324,7 @@ export default function AdminDashboard() {
           <Card sx={{
             mb: 4,
             p: 3,
-            bgcolor: "#c9b07a",
+            bgcolor: "#EAD1A8",
             borderRadius: 3,
             boxShadow: "none",
             maxWidth: 300,
@@ -364,7 +380,7 @@ export default function AdminDashboard() {
 
           <Card sx={{
             borderRadius: 3,
-            bgcolor: "#c9b07a",
+            bgcolor: "#EAD1A8",
             boxShadow: "none",
             overflow: "hidden",
           }}>
@@ -456,7 +472,7 @@ export default function AdminDashboard() {
                       <TableCell sx={{
                         color: "#6B5744",
                         fontWeight: 500,
-                        bgcolor: "#c9b07a",
+                        bgcolor: "#EAD1A8",
                         borderBottom: "1px solid #D9CDB8",
                       }}>
                         Name
@@ -465,7 +481,7 @@ export default function AdminDashboard() {
                       <TableCell sx={{
                         color: "#6B5744",
                         fontWeight: 500,
-                        bgcolor: "#c9b07a",
+                        bgcolor: "#EAD1A8",
                         borderBottom: "1px solid #D9CDB8",
                       }}>
                         Mail
@@ -475,7 +491,7 @@ export default function AdminDashboard() {
                         sx={{
                           color: "#6B5744",
                           fontWeight: 500,
-                          bgcolor: "#c9b07a",
+                          bgcolor: "#EAD1A8",
                           borderBottom: "1px solid #D9CDB8",
                         }}
                       >
@@ -489,9 +505,9 @@ export default function AdminDashboard() {
                       <TableRow
                         key={item._id}
                         sx={{
-                          bgcolor: "#c9b07a",
+                          bgcolor: "#EAD1A8",
                           "&:hover": {
-                            bgcolor: "#bca370",
+                            bgcolor: "#DFBF8E",
                           },
                         }}
                       >
@@ -637,6 +653,6 @@ export default function AdminDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Box >
   );
 }

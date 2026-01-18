@@ -41,6 +41,9 @@ import bookIcon from "../assets/book.svg";
 import worksheetsIcon from "../assets/worksheets.svg";
 import flowerLogo from "../assets/flower.png";
 import SendIcon from "../assets/icon.svg";
+import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
+import GraphicEqIcon from '@mui/icons-material/GraphicEq';
+import LandingIntro from "./components/LandingIntro";
 
 
 
@@ -138,6 +141,7 @@ export default function ChatScreenMui() {
     const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
     const [inputDisabled, setInputDisabled] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState(""); // temp transcript
+    const voiceTranscriptRef = useRef(""); // Ref for accessing inside callbacks
     const [isSpeaking, setIsSpeaking] = useState(false); // For animation toggle
 
     const summarySentRef = useRef(false);
@@ -162,6 +166,15 @@ export default function ChatScreenMui() {
 
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
+
+    // Landing Intro State
+    const [showLanding, setShowLanding] = useState(true);
+
+    // Voice Chat Mode State
+    const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+    const [voiceModeActive, setVoiceModeActive] = useState(false);
+    const continuousListeningRef = useRef(false); // Ref to track if we should restart listening
+    const silenceTimerRef = useRef(null); // Ref for 3s silence timeout
 
 
 
@@ -289,17 +302,23 @@ export default function ChatScreenMui() {
         recognition.onstart = () => {
             setIsListening(true);
             setIsSpeaking(false); // Reset
+
+            // Clear any stale timer
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+            // Initial timer: wait 4s for user to ANY speech
+            if (continuousListeningRef.current) {
+                silenceTimerRef.current = setTimeout(() => {
+                    console.log("Initial silence timeout. Stopping.");
+                    recognition.stop();
+                }, 4000);
+            }
         };
 
         recognition.onend = () => {
-            // If we stopped naturally but user didn't click actions, maybe we just stay 'not listening' 
-            // but we usually want to keep overlay if there is text? 
-            // accurate logic: if we confirmed/canceled, 'isListening' is set false there.
-            // if it stops on its own (silence), we might want to update UI state, 
-            // but for 'continuous', it tries to keep going.
-            // We'll trust manual controls to set isListening(false).
-            // But if it crashes/stops, we should probably sync state.
-            // Let's just track it loosely.
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            setIsListening(false);
+            setIsSpeaking(false);
         };
 
         recognition.onerror = (event) => {
@@ -346,11 +365,22 @@ export default function ChatScreenMui() {
             const currentTranscript = (fullTranscript + interimTranscript).trim();
             if (currentTranscript) {
                 setVoiceTranscript(currentTranscript);
+                voiceTranscriptRef.current = currentTranscript;
             }
 
             // Log interim for debugging if needed
-            if (interimTranscript) {
-                console.log('Interim:', interimTranscript);
+            // console.log('Interim:', interimTranscript);
+
+            // --- Silence Detection Logic ---
+            if (continuousListeningRef.current) {
+                // Clear existing timer
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
+                // Set new 3-second timer
+                silenceTimerRef.current = setTimeout(() => {
+                    console.log("3 seconds silence detected. Stopping recognition.");
+                    recognition.stop();
+                }, 3000);
             }
         };
 
@@ -859,6 +889,116 @@ export default function ChatScreenMui() {
         }
     }
 
+    // --- Voice Chat Mode Logic ---
+
+    function startVoiceMode() {
+        setVoiceModalOpen(false);
+        setVoiceModeActive(true);
+        continuousListeningRef.current = true;
+
+        // Start listening
+        const recognition = recognitionRef.current;
+        if (recognition) {
+            try {
+                recognition.start();
+                setIsListening(true);
+            } catch (e) {
+                console.log("Recognition already started or failed", e);
+            }
+        }
+    }
+
+    function stopVoiceMode() {
+        setVoiceModeActive(false);
+        continuousListeningRef.current = false;
+
+        const recognition = recognitionRef.current;
+        if (recognition) recognition.stop();
+        setIsListening(false);
+
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+    }
+
+    // Use this modified sendToServer for voice mode to auto-resume listening
+    // We already have sendToServer, but we need to ensure the `finally` block or `playBotVoice` 
+    // knows to restart listening if `continuousListeningRef.current` is true.
+    // Ideally, we hook into `playBotVoice` or creating a specialized effect.
+    // For simplicity, let's add a "onAudioEnd" callback to `playBotVoice`.
+
+    function playBotVoice(base64Audio) {
+        try {
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
+            }
+
+            const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
+            audioRef.current = audio;
+
+            audio.onended = () => {
+                if (continuousListeningRef.current) {
+                    // Resume listening after bot finishes speaking
+                    const recognition = recognitionRef.current;
+                    if (recognition) {
+                        try {
+                            recognition.start();
+                            setIsListening(true);
+                        } catch (e) { console.warn("Restart listening failed", e) }
+                    }
+                }
+            };
+
+            audio.play().catch(err => {
+                console.warn("Autoplay blocked:", err);
+            });
+        } catch (err) {
+            console.error("Audio play failed:", err);
+        }
+    }
+
+    // Also need to handle "silence" auto-send in Voice Mode?
+    // The user requirement: "until the user clicks that wave with end icon". 
+    // Usually this implies "Speak -> Silence -> Send -> Reply -> Speak again".
+    // We need to detect when user stops speaking to auto-send.
+    // existing `recognition.onend` is key.
+
+
+
+    // --- Effect to handle End of Speech in Voice Mode ---
+    useEffect(() => {
+        if (voiceModeActive && !isListening) {
+            // Recognition stopped. Check if we have text.
+            const text = voiceTranscript; // using state here is fine as this effect runs on update
+
+            if (text && text.trim()) {
+                const formatted = formatTranscript(text);
+                setLastInputWasVoice(true);
+                // clear transcript immediately so we don't send duplicates
+                setVoiceTranscript("");
+                voiceTranscriptRef.current = "";
+
+                // Send
+                sendToServer(formatted, true);
+            } else {
+                // Recognition stopped but no text (silence timeout).
+                // If we are still in voice mode, we should restart listening?
+                // CAREFUL: Infinite loop of start/stop if error.
+                // Maybe wait a bit?
+                if (continuousListeningRef.current) {
+                    const recognition = recognitionRef.current;
+                    if (recognition) {
+                        try {
+                            recognition.start();
+                            setIsListening(true);
+                        } catch (e) {/* ignore */ }
+                    }
+                }
+            }
+        }
+    }, [isListening, voiceModeActive]); // Runs when listening state changes
 
     useEffect(() => {
         const handler = () => sendChatSummary();
@@ -1181,9 +1321,12 @@ export default function ChatScreenMui() {
             }}
         >
             <CssBaseline />
-            {!splashComplete && (
-                <SplashScreen onComplete={() => setSplashComplete(true)} />
+
+            {/* Landing Intro Animation */}
+            {showLanding && (
+                <LandingIntro onComplete={() => setShowLanding(false)} />
             )}
+
             <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
 
             {/* Main App Content */}
@@ -1545,6 +1688,33 @@ export default function ChatScreenMui() {
                                 : "none",
                         }}
                     >
+                        {/* --- Voice Chat Modal (Global) --- */}
+                        <Dialog
+                            open={voiceModalOpen}
+                            onClose={() => setVoiceModalOpen(false)}
+                            PaperProps={{
+                                sx: {
+                                    bgcolor: "#F5E4C8", // Page background color
+                                    color: "#5b3f2a",
+                                    borderRadius: "20px",
+                                    border: "2px solid #5b3f2a"
+                                }
+                            }}
+                        >
+                            <DialogTitle sx={{ color: "#5b3f2a", fontWeight: "bold" }}>Start Voice Chat?</DialogTitle>
+                            <DialogContent>
+                                <DialogContentText sx={{ color: "#6e4c32" }}>
+                                    Do you want to start a continuous voice chat session with Luna?
+                                </DialogContentText>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setVoiceModalOpen(false)} sx={{ color: "#5b3f2a" }}>Cancel</Button>
+                                <Button onClick={startVoiceMode} variant="contained" sx={{ bgcolor: "#5b3f2a", color: "white", borderRadius: "10px", "&:hover": { bgcolor: "#4a3322" } }}>
+                                    Start
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+
                         <InteractiveSvgAvatar
                             maxOffsetPx={3}
                             style={{
@@ -1568,7 +1738,7 @@ export default function ChatScreenMui() {
                                         px: 2,
                                     }}
                                 >
-                                    <TypingAnimation duration={100} delay={!splashComplete}>
+                                    <TypingAnimation duration={100} delay={showLanding}>
                                         Welcome to Luna
                                     </TypingAnimation>
                                 </Typography>
@@ -1600,7 +1770,7 @@ export default function ChatScreenMui() {
                             >
                                 <ScaleLetterText
                                     text="Welcome to Luna"
-                                    delay={!splashComplete ? 0.5 : 0}
+                                    delay={showLanding ? 0.5 : 0}
                                 />
                                 {" "}
                                 <Box component="span" sx={{ fontWeight: 400 }}>
@@ -1622,7 +1792,7 @@ export default function ChatScreenMui() {
                                     px: 2,
                                 }}
                             >
-                                I'm here to support your emotional health in any way I can.!
+                                I'm here to support your emotional health in any way I can
                             </Typography>
                         )}
 
@@ -1697,13 +1867,14 @@ export default function ChatScreenMui() {
 
 
                                     {/* MIC INSIDE FIELD (hero) */}
+                                    {/* Positioned at right: 58 (now left of voice button) */}
                                     <IconButton
                                         type="button"
                                         aria-label="voice input"
                                         onClick={handleMicClick}
                                         sx={{
                                             position: "absolute",
-                                            right: 14,
+                                            right: 58,
                                             top: "50%",
                                             transform: "translateY(-50%)",
                                             width: 36,
@@ -1712,10 +1883,8 @@ export default function ChatScreenMui() {
                                             bgcolor: "transparent",
                                             boxShadow: "none",
                                             p: 0,
-                                            "&:hover": {
-                                                bgcolor: "transparent",
-                                            },
-                                            display: isListening ? "none" : "inline-flex", // Hide when listening to avoid blocking overlay buttons
+                                            "&:hover": { bgcolor: "transparent" },
+                                            display: isListening || voiceModeActive ? "none" : "inline-flex",
                                         }}
                                     >
                                         <Box
@@ -1725,30 +1894,67 @@ export default function ChatScreenMui() {
                                             sx={{
                                                 width: 22,
                                                 height: 22,
-                                                stroke: isListening
-                                                    ? "#b52a2a"
-                                                    : "#503920",
+                                                stroke: isListening ? "#b52a2a" : "#503920",
                                                 strokeWidth: 1.4,
                                                 fill: "none",
-                                                display: "block",
                                             }}
                                         >
                                             <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
                                             <path d="M19 11a7 7 0 0 1-14 0" />
-                                            <line
-                                                x1="12"
-                                                y1="17"
-                                                x2="12"
-                                                y2="21"
-                                            />
-                                            <line
-                                                x1="8"
-                                                y1="21"
-                                                x2="16"
-                                                y2="21"
-                                            />
+                                            <line x1="12" y1="17" x2="12" y2="21" />
+                                            <line x1="8" y1="21" x2="16" y2="21" />
                                         </Box>
                                     </IconButton>
+
+                                    {/* --- VOICE CHAT BUTTON (Landing) --- */}
+                                    {/* Positioned at right: 14 (far right) */}
+                                    <Box
+                                        sx={{
+                                            position: "absolute",
+                                            right: 14,
+                                            top: "50%",
+                                            transform: "translateY(-50%)",
+                                            zIndex: 20,
+                                            transition: "all 0.3s ease"
+                                        }}
+                                    >
+                                        <Button
+                                            onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
+                                            variant="contained"
+                                            sx={{
+                                                bgcolor: "#5b3f2a",
+                                                color: "white",
+                                                minWidth: voiceModeActive ? 120 : 36,
+                                                width: voiceModeActive ? "auto" : 36,
+                                                height: 36,
+                                                borderRadius: voiceModeActive ? "18px" : "50%",
+                                                p: 0,
+                                                px: voiceModeActive ? 2 : 0,
+                                                "&:hover": { bgcolor: "#4a3322" },
+                                                boxShadow: "none",
+                                                display: (isListening && !voiceModeActive) ? "none" : "flex",
+                                                gap: 1
+                                            }}
+                                        >
+                                            {voiceModeActive ? (
+                                                <>
+                                                    <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                    <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
+                                                </>
+                                            ) : (
+                                                <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                            )}
+                                        </Button>
+                                        {voiceModeActive && (
+                                            <style>{`
+                                                @keyframes float {
+                                                    0% { transform: translateY(0px); }
+                                                    50% { transform: translateY(-3px); }
+                                                    100% { transform: translateY(0px); }
+                                                }
+                                            `}</style>
+                                        )}
+                                    </Box>
                                 </Box>
 
                                 <Box
@@ -2123,29 +2329,28 @@ export default function ChatScreenMui() {
                                                 disabled={sending}
                                             />
 
+
+
                                             {/* MIC INSIDE FIELD (conversation) */}
+                                            {/* Left of voice button (58px) */}
                                             <IconButton
                                                 type="button"
                                                 aria-label="voice input"
                                                 onClick={handleMicClick}
                                                 sx={{
                                                     position: "absolute",
-                                                    right: 14,
+                                                    right: 58,
                                                     top: "50%",
-                                                    transform:
-                                                        "translateY(-50%)",
+                                                    transform: "translateY(-50%)",
                                                     width: 36,
                                                     height: 36,
                                                     borderRadius: "50%",
                                                     bgcolor: "transparent",
                                                     boxShadow: "none",
                                                     p: 0,
-                                                    "&:hover": {
-                                                        bgcolor: "transparent",
-                                                    },
-                                                    opacity: isListening
-                                                        ? 1
-                                                        : 0.9,
+                                                    "&:hover": { bgcolor: "transparent" },
+                                                    opacity: isListening ? 1 : 0.9,
+                                                    display: isListening || voiceModeActive ? "none" : "inline-flex"
                                                 }}
                                             >
                                                 <Box
@@ -2155,9 +2360,7 @@ export default function ChatScreenMui() {
                                                     sx={{
                                                         width: 22,
                                                         height: 22,
-                                                        stroke: isListening
-                                                            ? "#b52a2a"
-                                                            : "#503920",
+                                                        stroke: isListening ? "#b52a2a" : "#503920",
                                                         strokeWidth: 1.4,
                                                         fill: "none",
                                                         display: "block",
@@ -2165,20 +2368,60 @@ export default function ChatScreenMui() {
                                                 >
                                                     <path d="M12 14a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v4a3 3 0 0 0 3 3z" />
                                                     <path d="M19 11a7 7 0 0 1-14 0" />
-                                                    <line
-                                                        x1="12"
-                                                        y1="17"
-                                                        x2="12"
-                                                        y2="21"
-                                                    />
-                                                    <line
-                                                        x1="8"
-                                                        y1="21"
-                                                        x2="16"
-                                                        y2="21"
-                                                    />
+                                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                                    <line x1="8" y1="21" x2="16" y2="21" />
                                                 </Box>
                                             </IconButton>
+
+                                            {/* --- VOICE CHAT BUTTON (New) --- */}
+                                            {/* Rightmost (14px) */}
+                                            <Box
+                                                sx={{
+                                                    position: "absolute",
+                                                    right: 14,
+                                                    top: "50%",
+                                                    transform: "translateY(-50%)",
+                                                    zIndex: 20,
+                                                    transition: "all 0.3s ease"
+                                                }}
+                                            >
+                                                <Button
+                                                    onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
+                                                    variant="contained"
+                                                    sx={{
+                                                        bgcolor: "#5b3f2a",
+                                                        color: "white",
+                                                        minWidth: voiceModeActive ? 120 : 36,
+                                                        width: voiceModeActive ? "auto" : 36,
+                                                        height: 36,
+                                                        borderRadius: voiceModeActive ? "18px" : "50%",
+                                                        p: 0,
+                                                        px: voiceModeActive ? 2 : 0,
+                                                        "&:hover": { bgcolor: "#4a3322" },
+                                                        boxShadow: "none",
+                                                        display: (isListening && !voiceModeActive) ? "none" : "flex",
+                                                        gap: 1
+                                                    }}
+                                                >
+                                                    {voiceModeActive ? (
+                                                        <>
+                                                            <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                            <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
+                                                        </>
+                                                    ) : (
+                                                        <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                                    )}
+                                                </Button>
+                                                {voiceModeActive && (
+                                                    <style>{`
+                                                        @keyframes float {
+                                                            0% { transform: translateY(0px); }
+                                                            50% { transform: translateY(-3px); }
+                                                            100% { transform: translateY(0px); }
+                                                        }
+                                                    `}</style>
+                                                )}
+                                            </Box>
 
                                             {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
                                         </Box>
