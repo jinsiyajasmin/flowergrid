@@ -10,15 +10,15 @@
             "destination": "/api/index.js"
         },
         {
+            "source": "/conversations/:path*",
+            "destination": "/api/index.js"
+        },
+        {
             "source": "/admin/users",
             "destination": "/api/index.js"
         },
         {
             "source": "/admin/summaries",
-            "destination": "/api/index.js"
-        },
-        {
-            "source": "/conversations/:path*",
             "destination": "/api/index.js"
         },
         {
