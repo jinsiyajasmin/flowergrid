@@ -152,7 +152,7 @@ export default function AdminDashboard() {
             component="img"
             src={flowerGridLogo}
             alt="Flower Grid"
-            sx={{ width: 160, mb: 2 }}
+            sx={{ width: 100, mb: 2 }}
           />
 
           <Typography variant="h5" sx={{ color: "#6B5744", mb: 4, fontWeight: 500 }}>
@@ -272,7 +272,7 @@ export default function AdminDashboard() {
               src={flowerGridLogo}
               alt="Flower Grid"
               sx={{
-                width: 140,
+                width: 50,
                 mx: "auto",
                 mb: 1,
               }}
