@@ -298,7 +298,7 @@ export default function AdminDashboard() {
             display: "flex",
             alignItems: "center",
             gap: 2,
-            width: "77%", // Use full width of container
+            width: "82%", // Use full width of container
             // "Merged" look: removing right padding/margin effectively
             position: "relative",
             left: 4, // Slight offset to ensure overlap with main content area if needed, or just 0
