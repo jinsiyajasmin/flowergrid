@@ -1372,7 +1372,7 @@ export default function ChatScreenMui() {
                 {!isMobile && (
                     <Box
                         sx={{
-                            width: collapsed ? 180 : sidebarWidth,
+                            width: sidebarWidth,
                             bgcolor: SIDEBAR_BG,
                             color: "#664B2E",
                             display: "flex",
@@ -1668,7 +1668,7 @@ export default function ChatScreenMui() {
                 <Box
                     sx={{
                         flex: 1,
-                        marginLeft: isMobile ? 0 : (collapsed ? "100px" : `${sidebarWidth}px`),
+                        marginLeft: isMobile ? 0 : `${sidebarWidth}px`,
                         height: "100dvh",
                         overflow: "hidden", // Use flex layout instead of scrolling here
                         display: "flex",
@@ -2153,7 +2153,7 @@ export default function ChatScreenMui() {
                             sx={{
                                 display: "flex",
                                 flexDirection: "column",
-                                minHeight: "100vh",
+                                minHeight: "auto",
                                 pt: { xs: 8, md: 6 },
                                 pb: { xs: 12, md: 2 }, // Extra padding on mobile for fixed input
                             }}
