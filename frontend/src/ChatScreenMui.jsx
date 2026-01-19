@@ -44,7 +44,6 @@ import SendIcon from "../assets/icon.svg";
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import LandingIntro from "./components/LandingIntro";
-import AudioLines from "./components/AudioLines";
 
 
 
@@ -1328,8 +1327,8 @@ export default function ChatScreenMui() {
             <Box
                 sx={{
                     display: "flex",
-                    minHeight: "100vh",
-                    height: "100dvh",
+                    height: "100%", // Matches fixed body height
+                    width: "100%",
                     background: BG_GRADIENT,
                     marginLeft: 0,
                     fontFamily:
@@ -2428,13 +2427,22 @@ export default function ChatScreenMui() {
                                                     >
                                                         {voiceModeActive ? (
                                                             <>
-                                                                <AudioLines size={20} color="white" />
+                                                                <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
                                                                 <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
                                                             </>
                                                         ) : (
                                                             <GraphicEqIcon sx={{ fontSize: 20 }} />
                                                         )}
                                                     </Button>
+                                                    {voiceModeActive && (
+                                                        <style>{`
+                                                        @keyframes float {
+                                                            0% { transform: translateY(0px); }
+                                                            50% { transform: translateY(-3px); }
+                                                            100% { transform: translateY(0px); }
+                                                        }
+                                                    `}</style>
+                                                    )}
                                                 </Box>
 
                                                 {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}

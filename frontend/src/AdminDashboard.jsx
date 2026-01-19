@@ -250,13 +250,15 @@ export default function AdminDashboard() {
 
   return (
     <Box sx={{
-      minHeight: "100vh",
+      height: "100vh", // Fixed height
+      overflow: "hidden", // Prevent outer scroll
       bgcolor: "#F5E4C8",
       display: "flex"
     }}>
       {!isMobile && (
         <Box sx={{
           width: 200,
+          height: "100%", // Full height
           bgcolor: "#6B4A2A",
           color: "white",
           py: 4,
@@ -318,7 +320,12 @@ export default function AdminDashboard() {
       )
       }
 
-      <Box sx={{ flex: 1, p: { xs: 2, md: 4 } }}>
+      <Box sx={{
+        flex: 1,
+        p: { xs: 2, md: 4 },
+        height: "100%", // Take full height
+        overflowY: "auto", // Scroll internally
+      }}>
         <Box sx={{ maxWidth: 1400, mx: "auto" }}>
           <Typography
             variant="h5"
