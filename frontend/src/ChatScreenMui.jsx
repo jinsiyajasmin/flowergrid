@@ -2030,239 +2030,158 @@ export default function ChatScreenMui() {
                                         </Box>
                                     </Box>
                                 </Box>
-                                {!isMobile && (
-                                    <>
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                textAlign: "center",
-                                                fontStyle: "italic",
-                                                mb: 2,
-                                                color: "#4E351A",
-                                                fontFamily: "Poppins",
-                                                fontSize: 14,
-                                            }}
-                                        >
-                                            What people talk about most.
-                                        </Typography>
-
-
-                                        <Box
-                                            sx={{
-                                                display: "flex",
-                                                gap: 2,
-                                                justifyContent: "center",
-                                                mt: 1,
-                                            }}
-                                        >
-                                            {quickTopics.slice(0, 3).map((t) => (
-                                                <Chip
-                                                    key={t}
-                                                    label={t}
-                                                    onClick={() => setInput(t)}
-                                                    variant="outlined"
-                                                    sx={{
-                                                        borderRadius: 99,
-                                                        borderColor: "#9E7F49",
-                                                        background: "transparent",
-                                                        color: "rgba(80, 57, 32, 0.6)",
-                                                        px: 3,
-                                                        minWidth: 140,
-                                                        "& .MuiChip-label": {
-                                                            py: 0.7,
-                                                            fontSize: 14,
-                                                            fontFamily: "Poppins",
-                                                        },
-                                                    }}
-                                                />
-                                            ))}
-                                        </Box>
-                                        <Box
-                                            sx={{
-                                                display: "flex",
-                                                gap: 2,
-                                                justifyContent: "center",
-                                                mt: 2,
-                                            }}
-                                        >
-                                            {quickTopics.slice(3, 5).map((t) => (
-                                                <Chip
-                                                    key={t}
-                                                    label={t}
-                                                    onClick={() => setInput(t)}
-                                                    variant="outlined"
-                                                    sx={{
-                                                        borderRadius: 99,
-                                                        borderColor: "#9E7F49",
-                                                        background: "transparent",
-                                                        color: "rgba(80, 57, 32, 0.6)",
-                                                        px: 3,
-                                                        minWidth: 140,
-                                                        "& .MuiChip-label": {
-                                                            py: 0.7,
-                                                            fontSize: 14,
-                                                            fontFamily: "Poppins",
-                                                        },
-                                                    }}
-                                                />
-                                            ))}
-                                        </Box>
-
-
-                                        <Typography
-                                            variant="caption"
-                                            sx={{
-                                                mt: 6,
-                                                color: "#826840",
-                                                fontSize: 16,
-                                                fontWeight: 300,
-                                            }}
-                                        >
-                                            Disclaimer: Luna offers support, not medical care.
-                                            Always consult a professional.
-                                        </Typography>
-                                    </>
-                                )}
-
                             </Box>
+                            {!isMobile && (
+                                <>
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            textAlign: "center",
+                                            fontStyle: "italic",
+                                            mb: 2,
+                                            color: "#4E351A",
+                                            fontFamily: "Poppins",
+                                            fontSize: 14,
+                                        }}
+                                    >
+                                        What people talk about most.
+                                    </Typography>
 
-                            {isMobile && !conversationMode && (
-                                <Box sx={{ mt: "auto", pb: 3, width: "100%" }}>
+
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            gap: 2,
+                                            justifyContent: "center",
+                                            mt: 1,
+                                        }}
+                                    >
+                                        {quickTopics.slice(0, 3).map((t) => (
+                                            <Chip
+                                                key={t}
+                                                label={t}
+                                                onClick={() => setInput(t)}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 99,
+                                                    borderColor: "#9E7F49",
+                                                    background: "transparent",
+                                                    color: "rgba(80, 57, 32, 0.6)",
+                                                    px: 3,
+                                                    minWidth: 140,
+                                                    "& .MuiChip-label": {
+                                                        py: 0.7,
+                                                        fontSize: 14,
+                                                        fontFamily: "Poppins",
+                                                    },
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            gap: 2,
+                                            justifyContent: "center",
+                                            mt: 2,
+                                        }}
+                                    >
+                                        {quickTopics.slice(3, 5).map((t) => (
+                                            <Chip
+                                                key={t}
+                                                label={t}
+                                                onClick={() => setInput(t)}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 99,
+                                                    borderColor: "#9E7F49",
+                                                    background: "transparent",
+                                                    color: "rgba(80, 57, 32, 0.6)",
+                                                    px: 3,
+                                                    minWidth: 140,
+                                                    "& .MuiChip-label": {
+                                                        py: 0.7,
+                                                        fontSize: 14,
+                                                        fontFamily: "Poppins",
+                                                    },
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+
+
                                     <Typography
                                         variant="caption"
-                                        align="center"
                                         sx={{
-                                            color: "rgba(80, 57, 32, 0.5)",
-                                            px: 4,
-                                            fontSize: 14,
-                                            fontWeight: 100,
-                                            display: "block",
-                                            textAlign: "center"
+                                            mt: 6,
+                                            color: "#826840",
+                                            fontSize: 16,
+                                            fontWeight: 300,
                                         }}
                                     >
                                         Disclaimer: Luna offers support, not medical care.
                                         Always consult a professional.
                                     </Typography>
-                                </Box>
+                                </>
                             )}
 
-                            {/* Conversation view */}
-                            {conversationMode && (
+                    </Box>
+
+                    {isMobile && !conversationMode && (
+                        <Box sx={{ mt: "auto", pb: 3, width: "100%" }}>
+                            <Typography
+                                variant="caption"
+                                align="center"
+                                sx={{
+                                    color: "rgba(80, 57, 32, 0.5)",
+                                    px: 4,
+                                    fontSize: 14,
+                                    fontWeight: 100,
+                                    display: "block",
+                                    textAlign: "center"
+                                }}
+                            >
+                                Disclaimer: Luna offers support, not medical care.
+                                Always consult a professional.
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* Conversation view */}
+                    {conversationMode && (
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                minHeight: "100vh",
+                                pt: { xs: 8, md: 6 },
+                                pb: { xs: 12, md: 2 }, // Extra padding on mobile for fixed input
+                            }}
+                        >
+                            <Box sx={{ flex: 1, pb: 2 }}>
                                 <Box
                                     sx={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        minHeight: "100vh",
-                                        pt: { xs: 8, md: 6 },
-                                        pb: { xs: 12, md: 2 }, // Extra padding on mobile for fixed input
+                                        maxWidth: 900,
+                                        mx: "auto",
+                                        py: 2,
                                     }}
                                 >
-                                    <Box sx={{ flex: 1, pb: 2 }}>
+                                    {messages.map((m) => (
                                         <Box
+                                            key={m.id}
                                             sx={{
-                                                maxWidth: 900,
-                                                mx: "auto",
-                                                py: 2,
+                                                mb: 2,
+                                                display: "flex",
+                                                gap: 1,
+                                                alignItems: "flex-start",
+                                                justifyContent:
+                                                    m.from === "user"
+                                                        ? "flex-end"
+                                                        : "flex-start",
                                             }}
                                         >
-                                            {messages.map((m) => (
-                                                <Box
-                                                    key={m.id}
-                                                    sx={{
-                                                        mb: 2,
-                                                        display: "flex",
-                                                        gap: 1,
-                                                        alignItems: "flex-start",
-                                                        justifyContent:
-                                                            m.from === "user"
-                                                                ? "flex-end"
-                                                                : "flex-start",
-                                                    }}
-                                                >
-                                                    {m.from === "bot" ? (
-                                                        <>
-                                                            <Box
-                                                                sx={{
-                                                                    width: 40,
-                                                                    height: 40,
-                                                                    flexShrink: 0,
-                                                                }}
-                                                            >
-                                                                <InteractiveSvgAvatar
-                                                                    keepEyesClosed={true}
-                                                                    maxOffsetPx={3}
-                                                                    style={{
-                                                                        width: 40,
-                                                                        height: 40,
-                                                                        marginTop: 0,
-                                                                        marginBottom: 0,
-                                                                    }}
-                                                                />
-                                                            </Box>
-                                                            <Paper
-                                                                elevation={0}
-                                                                sx={{
-                                                                    p: 1.2,
-                                                                    px: 2,
-                                                                    borderRadius: 2,
-                                                                    backgroundColor:
-                                                                        PAPER_BG,
-                                                                    color: ACCENT_DARK,
-                                                                    maxWidth: "80%",
-                                                                    whiteSpace:
-                                                                        "pre-wrap",
-                                                                }}
-                                                            >
-                                                                <Typography
-                                                                    variant="body1"
-                                                                    sx={{
-                                                                        color: ACCENT_DARK,
-                                                                    }}
-                                                                >
-                                                                    {m.text}
-                                                                </Typography>
-                                                            </Paper>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Paper
-                                                                elevation={0}
-                                                                sx={{
-                                                                    p: 1.2,
-                                                                    px: 2,
-                                                                    borderRadius: 2,
-                                                                    backgroundColor:
-                                                                        "#fff",
-                                                                    color: ACCENT_DARK,
-                                                                    maxWidth: "80%",
-                                                                    whiteSpace:
-                                                                        "pre-wrap",
-                                                                }}
-                                                            >
-                                                                <Typography
-                                                                    variant="body1"
-                                                                    sx={{
-                                                                        color: ACCENT_DARK,
-                                                                    }}
-                                                                >
-                                                                    {m.text}
-                                                                </Typography>
-                                                            </Paper>
-                                                        </>
-                                                    )}
-                                                </Box>
-                                            ))}
-
-
-                                            {sending && (
-                                                <Box
-                                                    sx={{
-                                                        mb: 2,
-                                                        display: "flex",
-                                                        gap: 1,
-                                                        alignItems: "flex-start",
-                                                    }}
-                                                >
+                                            {m.from === "bot" ? (
+                                                <>
                                                     <Box
                                                         sx={{
                                                             width: 40,
@@ -2281,21 +2200,102 @@ export default function ChatScreenMui() {
                                                             }}
                                                         />
                                                     </Box>
-                                                    <Box sx={{ mt: 0.3 }}>
-                                                        <TypingIndicator
-                                                            bg={INPUT_BG}
-                                                            color={ACCENT_DARK}
-                                                        />
-                                                    </Box>
-                                                </Box>
+                                                    <Paper
+                                                        elevation={0}
+                                                        sx={{
+                                                            p: 1.2,
+                                                            px: 2,
+                                                            borderRadius: 2,
+                                                            backgroundColor:
+                                                                PAPER_BG,
+                                                            color: ACCENT_DARK,
+                                                            maxWidth: "80%",
+                                                            whiteSpace:
+                                                                "pre-wrap",
+                                                        }}
+                                                    >
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                color: ACCENT_DARK,
+                                                            }}
+                                                        >
+                                                            {m.text}
+                                                        </Typography>
+                                                    </Paper>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Paper
+                                                        elevation={0}
+                                                        sx={{
+                                                            p: 1.2,
+                                                            px: 2,
+                                                            borderRadius: 2,
+                                                            backgroundColor:
+                                                                "#fff",
+                                                            color: ACCENT_DARK,
+                                                            maxWidth: "80%",
+                                                            whiteSpace:
+                                                                "pre-wrap",
+                                                        }}
+                                                    >
+                                                        <Typography
+                                                            variant="body1"
+                                                            sx={{
+                                                                color: ACCENT_DARK,
+                                                            }}
+                                                        >
+                                                            {m.text}
+                                                        </Typography>
+                                                    </Paper>
+                                                </>
                                             )}
-
-                                            <div ref={messagesEndRef} />
                                         </Box>
-                                    </Box>
+                                    ))}
+
+
+                                    {sending && (
+                                        <Box
+                                            sx={{
+                                                mb: 2,
+                                                display: "flex",
+                                                gap: 1,
+                                                alignItems: "flex-start",
+                                            }}
+                                        >
+                                            <Box
+                                                sx={{
+                                                    width: 40,
+                                                    height: 40,
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <InteractiveSvgAvatar
+                                                    keepEyesClosed={true}
+                                                    maxOffsetPx={3}
+                                                    style={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        marginTop: 0,
+                                                        marginBottom: 0,
+                                                    }}
+                                                />
+                                            </Box>
+                                            <Box sx={{ mt: 0.3 }}>
+                                                <TypingIndicator
+                                                    bg={INPUT_BG}
+                                                    color={ACCENT_DARK}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    )}
+
+                                    <div ref={messagesEndRef} />
                                 </Box>
-                                    </Box>
-                        )}
+                            </Box>
+                        </Box>
+                    )}
                 </Container>
             </Box >
 
@@ -2550,6 +2550,6 @@ export default function ChatScreenMui() {
                 </DialogActions>
             </Dialog>
         </Box >
-        </>
+            </>
     );
 }
