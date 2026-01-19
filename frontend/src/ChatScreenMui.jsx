@@ -552,7 +552,7 @@ export default function ChatScreenMui() {
                 }}
             >
                 {/* Center Waveform Area */}
-                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center" }}>
                     {/* Dotted Line - Always there */}
                     <Box
                         sx={{
@@ -569,13 +569,37 @@ export default function ChatScreenMui() {
                         }}
                     />
 
+
                     {isSpeaking && (
-                        <AudioLines size={60} color="#ffffff" />
+                        <Box
+                            sx={{
+                                display: "flex",
+                                gap: "2px",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: "100%",
+                                zIndex: 1,
+                            }}
+                        >
+                            {[...Array(24)].map((_, i) => (
+                                <Box
+                                    key={i}
+                                    sx={{
+                                        width: 2,
+                                        height: `${8 * (modulation[i] || 1)}px`,
+                                        borderRadius: 2,
+                                        backgroundColor: "#ffffff",
+                                        transition: "height 0.1s ease-in-out",
+                                        animation: "wavePulse 1.2s infinite ease-in-out",
+                                        animationDelay: `${(23 - i) * 0.05}s`, // Move from right to left (originating from icons)
+                                    }}
+                                />
+                            ))}
+                        </Box>
                     )}
                 </Box>
 
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 0.5 }}>
-                    {/* Buttons remain same */}
                     <IconButton
                         onClick={onCancel}
                         size="small"
@@ -607,6 +631,14 @@ export default function ChatScreenMui() {
                 </Box>
 
                 <style>{`
+        @keyframes wavePulse {
+          0%, 100% {
+            opacity: 0.5;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
         @keyframes marquee {
             0% { background-position: 0 0; }
             100% { background-position: 24px 0; }
@@ -2396,22 +2428,13 @@ export default function ChatScreenMui() {
                                                     >
                                                         {voiceModeActive ? (
                                                             <>
-                                                                <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                                <AudioLines size={20} color="white" />
                                                                 <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
                                                             </>
                                                         ) : (
                                                             <GraphicEqIcon sx={{ fontSize: 20 }} />
                                                         )}
                                                     </Button>
-                                                    {voiceModeActive && (
-                                                        <style>{`
-                                                        @keyframes float {
-                                                            0% { transform: translateY(0px); }
-                                                            50% { transform: translateY(-3px); }
-                                                            100% { transform: translateY(0px); }
-                                                        }
-                                                    `}</style>
-                                                    )}
                                                 </Box>
 
                                                 {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
