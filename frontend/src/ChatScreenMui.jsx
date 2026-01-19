@@ -44,6 +44,7 @@ import SendIcon from "../assets/icon.svg";
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import LandingIntro from "./components/LandingIntro";
+import AudioLines from "./components/AudioLines";
 
 
 
@@ -551,7 +552,7 @@ export default function ChatScreenMui() {
                 }}
             >
                 {/* Center Waveform Area */}
-                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center" }}>
+                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {/* Dotted Line - Always there */}
                     <Box
                         sx={{
@@ -568,37 +569,13 @@ export default function ChatScreenMui() {
                         }}
                     />
 
-
                     {isSpeaking && (
-                        <Box
-                            sx={{
-                                display: "flex",
-                                gap: "2px",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: "100%",
-                                zIndex: 1,
-                            }}
-                        >
-                            {[...Array(24)].map((_, i) => (
-                                <Box
-                                    key={i}
-                                    sx={{
-                                        width: 2,
-                                        height: `${8 * (modulation[i] || 1)}px`,
-                                        borderRadius: 2,
-                                        backgroundColor: "#ffffff",
-                                        transition: "height 0.1s ease-in-out",
-                                        animation: "wavePulse 1.2s infinite ease-in-out",
-                                        animationDelay: `${(23 - i) * 0.05}s`, // Move from right to left (originating from icons)
-                                    }}
-                                />
-                            ))}
-                        </Box>
+                        <AudioLines size={60} color="#ffffff" />
                     )}
                 </Box>
 
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 0.5 }}>
+                    {/* Buttons remain same */}
                     <IconButton
                         onClick={onCancel}
                         size="small"
@@ -630,14 +607,6 @@ export default function ChatScreenMui() {
                 </Box>
 
                 <style>{`
-        @keyframes wavePulse {
-          0%, 100% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 1;
-          }
-        }
         @keyframes marquee {
             0% { background-position: 0 0; }
             100% { background-position: 24px 0; }
