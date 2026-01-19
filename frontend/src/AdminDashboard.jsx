@@ -266,7 +266,13 @@ export default function AdminDashboard() {
           flexDirection: "column",
         }}>
 
-          <Box sx={{ mb: 6, textAlign: "center" }}>
+          <Box sx={{
+            mb: 6,
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center"
+          }}>
             <Box
               component="img"
               src={flowerGridLogo}
