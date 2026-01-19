@@ -1328,7 +1328,7 @@ export default function ChatScreenMui() {
                 sx={{
                     display: "flex",
                     minHeight: "100vh",
-                    height: "100vh",
+                    height: "100dvh",
                     background: BG_GRADIENT,
                     marginLeft: 0,
                     fontFamily:
@@ -1669,7 +1669,7 @@ export default function ChatScreenMui() {
                     sx={{
                         flex: 1,
                         marginLeft: isMobile ? 0 : (collapsed ? "100px" : `${sidebarWidth}px`),
-                        height: "100vh",
+                        height: "100dvh",
                         overflowY: "auto",
                         overflowX: "hidden",
                         transition: "margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1)",

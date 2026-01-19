@@ -29,7 +29,7 @@ import Visibility from "@mui/icons-material/Visibility";
 import VisibilityOff from "@mui/icons-material/VisibilityOff";
 import InputAdornment from "@mui/material/InputAdornment";
 import TextField from "@mui/material/TextField";
-import flowerGridLogo from "../assets/flowergrid_logo.png";
+import flowerGridLogo from "../assets/flowergrid_logo_text.png";
 import PeopleIcon from "../assets/none.png";
 import AnimatedDashboardIcon from "./components/AnimatedDashboardIcon";
 
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
             component="img"
             src={flowerGridLogo}
             alt="Flower Grid"
-            sx={{ width: 150, mb: 2 }}
+            sx={{ width: 160, mb: 2 }}
           />
 
           <Typography variant="h5" sx={{ color: "#6B5744", mb: 4, fontWeight: 500 }}>
@@ -271,7 +271,7 @@ export default function AdminDashboard() {
               src={flowerGridLogo}
               alt="Flower Grid"
               sx={{
-                width: 150,
+                width: 140,
                 mx: "auto",
                 mb: 1,
               }}
