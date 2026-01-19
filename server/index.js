@@ -11,14 +11,18 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import connectDB from './db.js';
 import User from './models/User.js';
 import ChatSummary from './models/ChatSummary.js';
+import { fileURLToPath } from 'url';
 
 
 
 
 const app = express();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const PORT = process.env.PORT || 4000;
-const KB_DIR = path.resolve('./kb');
+const KB_DIR = path.join(__dirname, 'kb');
 const KB_EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
 const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
