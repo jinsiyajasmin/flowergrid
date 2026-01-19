@@ -2292,7 +2292,7 @@ export default function ChatScreenMui() {
                                         borderTop: 1,
                                         borderColor: "rgba(0,0,0,0.08)",
                                         pt: 2,
-                                        pb: { xs: 2, md: 0.5 },
+                                        pb: 0, // Remove bottom padding
                                         position: { xs: "fixed", md: "sticky" }, // Fixed on mobile, sticky on desktop
                                         bottom: 0,
                                         left: { xs: 0, md: "auto" },
@@ -2500,7 +2500,8 @@ export default function ChatScreenMui() {
                                                 fontWeight: 400,
                                                 display: "block",
                                                 textAlign: "center",
-                                                mt: 1.5,
+                                                mt: 1, // Reduced margin
+                                                mb: 1, // Add explicit bottom margin for spacing if needed, but keeping small
                                                 width: "100%",
                                             }}
                                         >
