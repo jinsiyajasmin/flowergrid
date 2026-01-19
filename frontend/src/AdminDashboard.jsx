@@ -274,7 +274,7 @@ export default function AdminDashboard() {
               sx={{
                 width: 50,
                 mx: "auto",
-                mb: 1,
+                mb: 1, // Space between logos
               }}
             />
             <Box
@@ -284,7 +284,7 @@ export default function AdminDashboard() {
               sx={{
                 width: 140,
                 mx: "auto",
-                mb: 1,
+                mb: 0,
               }}
             />
           </Box>

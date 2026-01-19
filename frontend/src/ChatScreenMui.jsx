@@ -1333,7 +1333,7 @@ export default function ChatScreenMui() {
                     marginLeft: 0,
                     fontFamily:
                         "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial",
-                    overflowY: "auto",
+                    overflow: "hidden", // Fixes keyboard push
                 }}
             >
                 <CssBaseline />
