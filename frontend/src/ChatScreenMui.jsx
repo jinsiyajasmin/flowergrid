@@ -2144,7 +2144,7 @@ export default function ChatScreenMui() {
                                     flexDirection: "column",
                                     minHeight: "100vh",
                                     pt: { xs: 8, md: 6 },
-                                    pb: 2,
+                                    pb: { xs: 12, md: 2 }, // Extra padding on mobile for fixed input
                                 }}
                             >
                                 <Box sx={{ flex: 1, pb: 2 }}>
@@ -2292,9 +2292,12 @@ export default function ChatScreenMui() {
                                         borderTop: 1,
                                         borderColor: "rgba(0,0,0,0.08)",
                                         pt: 2,
-                                        pb: 0.5,
-                                        position: "sticky",
+                                        pb: { xs: 2, md: 0.5 },
+                                        position: { xs: "fixed", md: "sticky" }, // Fixed on mobile, sticky on desktop
                                         bottom: 0,
+                                        left: { xs: 0, md: "auto" },
+                                        right: { xs: 0, md: "auto" },
+                                        width: { xs: "100%", md: "auto" },
                                         background: BG_GRADIENT,
                                         backgroundAttachment: "fixed",
                                         zIndex: 100,
