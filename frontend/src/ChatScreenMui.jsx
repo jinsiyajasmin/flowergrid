@@ -408,7 +408,7 @@ export default function ChatScreenMui() {
         const sessionId = getOrCreateSessionId();
 
         try {
-            const sessionId = getOrCreateSessionId();
+
 
             const resp = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
@@ -2499,7 +2499,7 @@ export default function ChatScreenMui() {
                                 display: "block",
                                 textAlign: "center",
                                 mt: 1,
-                                mb: 1,
+                                mb: 0,
                                 width: "100%",
                             }}
                         >
@@ -2550,6 +2550,7 @@ export default function ChatScreenMui() {
                 </DialogActions>
             </Dialog>
         </Box >
+    </Box >
             </>
     );
 }
