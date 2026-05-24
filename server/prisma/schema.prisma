@@ -19,6 +19,7 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   chatSummaries ChatSummary[]
+  chatSessions  ChatSession[]
 
   @@map("users")
 }
@@ -40,4 +41,21 @@ model ChatSummary {
 
   @@unique([userId, sessionId])
   @@map("chat_summaries")
+}
+
+model ChatSession {
+  sessionId             String   @id @map("session_id")
+  userId                String?  @map("user_id")
+  shortMessages         Json     @default("[]") @map("short_messages")
+  fullMessages          Json     @default("[]") @map("full_messages")
+  guestExhausted        Boolean  @default(false) @map("guest_exhausted")
+  practitionerSuggested Boolean  @default(false) @map("practitioner_suggested")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@map("chat_sessions")
 }

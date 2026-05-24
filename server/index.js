@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
@@ -9,6 +10,20 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import connectDB, { prisma } from './db.js';
+import {
+  ensureSession,
+  getSessionMessages,
+  getFullSessionMessages,
+  countBotMessages,
+  recordChatExchange,
+  resumeSession,
+  clearSession,
+  syncSessionFromSummary,
+  isPractitionerSuggested,
+  setPractitionerSuggested,
+  isGuestExhausted as isSessionGuestExhausted,
+  setGuestExhausted,
+} from './sessionStore.js';
 import { fileURLToPath } from 'url';
 
 
@@ -27,7 +42,6 @@ const KB_EMBED_MODEL = process.env.EMBED_MODEL || 'text-embedding-3-small';
 const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
 const KB_EMBED_CHUNK_OVERLAP = 200;
-const SUMMARY_CONTEXT = new Map();
 
 const allowedOrigins = [
   'https://flowergrid.vercel.app',
@@ -165,24 +179,47 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    const user = req.user;
-    const frontendUrl = process.env.FRONTEND_URL || "https://flowergrid.vercel.app";
-
-
-    const userPayload = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      avatar: user.avatar,
-    };
-
-    res.redirect(
-      `${frontendUrl}?user=${encodeURIComponent(
-        JSON.stringify(userPayload)
-      )}`
-    );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(frontendUrl);
   }
 );
+
+app.get('/auth/me', async (req, res) => {
+  try {
+    if (req.isAuthenticated?.() && req.user) {
+      return res.json({ user: publicUser(req.user) });
+    }
+    const user = await getRequestUser(req);
+    if (user) {
+      return res.json({ user: publicUser(user) });
+    }
+    res.json({ user: null });
+  } catch (err) {
+    console.error('Auth me error:', err);
+    res.status(500).json({ error: 'Failed to load user' });
+  }
+});
+
+app.post('/auth/logout', (req, res) => {
+  const finish = () => {
+    clearGuestExhaustedCookie(res);
+    clearChatSessionCookie(res);
+    res.json({ success: true });
+  };
+
+  if (typeof req.logout === 'function') {
+    req.logout((err) => {
+      if (err) console.error('Logout error:', err);
+      if (req.session?.destroy) {
+        req.session.destroy(() => finish());
+      } else {
+        finish();
+      }
+    });
+  } else {
+    finish();
+  }
+});
 
 
 // Stateless authentication middleware for Vercel
@@ -215,6 +252,7 @@ async function authenticateUser(req, res, next) {
 
 const GUEST_BOT_REPLY_LIMIT = 5;
 const GUEST_EXHAUSTED_COOKIE = 'flora_guest_exhausted';
+const CHAT_SESSION_COOKIE = 'flora_chat_session';
 
 function parseCookies(req) {
   const header = req.headers.cookie;
@@ -248,10 +286,79 @@ function clearGuestExhaustedCookie(res) {
     secure: process.env.NODE_ENV === 'production',
   });
 }
+
+function getChatSessionCookie(req) {
+  return parseCookies(req)[CHAT_SESSION_COOKIE] || null;
+}
+
+function setChatSessionCookie(res, sessionId) {
+  res.cookie(CHAT_SESSION_COOKIE, sessionId, {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  });
+}
+
+function clearChatSessionCookie(res) {
+  res.clearCookie(CHAT_SESSION_COOKIE, {
+    path: '/',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
+
+function resolveSessionId(req) {
+  const fromBody = req.body?.sessionId;
+  if (fromBody && typeof fromBody === 'string') return fromBody;
+  return getChatSessionCookie(req);
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar ?? null,
+  };
+}
+
+async function isGuestLimitReached(sessionId, req) {
+  const user = await getRequestUser(req);
+  if (user) return false;
+  if (isGuestExhausted(req)) return true;
+  if (sessionId && (await isSessionGuestExhausted(sessionId))) return true;
+  if (sessionId) {
+    const botReplyCount = await countBotMessages(sessionId);
+    if (botReplyCount >= GUEST_BOT_REPLY_LIMIT) return true;
+  }
+  return false;
+}
+
+/** Guest limit flags for /chat JSON responses (persist exhausted state when limit hit). */
+async function guestResponseFlags(sessionId, req, res) {
+  const user = await getRequestUser(req);
+  if (user) {
+    return { guestLimitReached: false, disableInput: false };
+  }
+
+  const limited = await isGuestLimitReached(sessionId, req);
+  if (limited) {
+    if (!(await isSessionGuestExhausted(sessionId))) {
+      await setGuestExhausted(sessionId, true, null);
+    }
+    setGuestExhaustedCookie(res);
+  }
+
+  return {
+    guestLimitReached: limited,
+    disableInput: limited,
+  };
+}
+
 const LOGGED_IN_PRACTITIONER_REPLY_AT = 6; // 7th Luna reply (after 6 prior bot answers)
 const BOOKING_URL = 'https://flowergrid.co.uk/booking';
-
-const practitionerSuggestedSessions = new Set();
 
 const LOGIN_REQUIRED_MESSAGE =
   'You have used your free messages with Luna.\n\n' +
@@ -273,34 +380,28 @@ function isAdmin(req) {
   return req.user?.email === "admin@flowergrid.co.uk";
 }
 
-function countBotMessages(sessionId) {
-  const messages = getSessionMessages(sessionId);
-  return messages.filter(m => m.role === 'assistant').length;
-}
-
 async function checkGuestReplyLimit(sessionId, req, userText, res) {
   const user = await getRequestUser(req);
   if (user) return null;
 
-  const botReplyCount = countBotMessages(sessionId);
+  await ensureSession(sessionId, null);
+
+  const botReplyCount = await countBotMessages(sessionId);
   const exhausted =
-    isGuestExhausted(req) || botReplyCount >= GUEST_BOT_REPLY_LIMIT;
+    isGuestExhausted(req) ||
+    (await isSessionGuestExhausted(sessionId)) ||
+    botReplyCount >= GUEST_BOT_REPLY_LIMIT;
 
   if (!exhausted) return null;
 
-  addToSession(sessionId, 'user', userText);
-  addToSession(sessionId, 'assistant', LOGIN_REQUIRED_MESSAGE);
+  await recordChatExchange(sessionId, userText, LOGIN_REQUIRED_MESSAGE, null);
+  await setGuestExhausted(sessionId, true, null);
   if (res) setGuestExhaustedCookie(res);
   return {
     answer: LOGIN_REQUIRED_MESSAGE,
     disableInput: true,
     guestLimitReached: true,
   };
-}
-
-function recordChatExchange(sessionId, userText, botText) {
-  addToSession(sessionId, 'user', userText);
-  addToSession(sessionId, 'assistant', botText);
 }
 
 async function generatePractitionerRecommendation(history, latestUserMessage) {
@@ -521,27 +622,6 @@ function detectPricing(text) {
 }
 
 
-const SESSION_CONTEXT = new Map();
-function addToSession(sessionId, role, content) {
-  if (!sessionId) return;
-
-  // Short context for chat
-  const shortArr = SESSION_CONTEXT.get(sessionId) || [];
-  shortArr.push({ role, content });
-  SESSION_CONTEXT.set(sessionId, shortArr.slice(-SESSION_MAX_MESSAGES));
-
-  // Full context for summary
-  const fullArr = SUMMARY_CONTEXT.get(sessionId) || [];
-  fullArr.push({ role, content });
-  SUMMARY_CONTEXT.set(sessionId, fullArr);
-}
-
-
-function getSessionMessages(sessionId) {
-  if (!sessionId) return [];
-  return SESSION_CONTEXT.get(sessionId) || [];
-}
-
 async function textToSpeech(text) {
   const response = await openai.audio.speech.create({
     model: "gpt-4o-mini-tts", // high-quality, calm voice
@@ -670,7 +750,7 @@ async function chatWithFlora(history, userMessage, options = {}) {
 
 app.post('/chat', async (req, res) => {
   try {
-    const { message, sessionId } = req.body;
+    const { message } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message required' });
@@ -687,12 +767,22 @@ app.post('/chat', async (req, res) => {
       clearGuestExhaustedCookie(res);
     }
 
+    let sessionId = resolveSessionId(req);
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      await ensureSession(sessionId, user?.id ?? null);
+      setChatSessionCookie(res, sessionId);
+    } else {
+      setChatSessionCookie(res, sessionId);
+      await ensureSession(sessionId, user?.id ?? null);
+    }
+
     const guestBlocked = await checkGuestReplyLimit(sessionId, req, text, res);
     if (guestBlocked) {
       return res.json(guestBlocked);
     }
 
-    const botReplyCount = countBotMessages(sessionId);
+    const botReplyCount = await countBotMessages(sessionId);
 
     if (detectSelfHarm(text)) {
       const crisis =
@@ -702,24 +792,27 @@ app.post('/chat', async (req, res) => {
         '- Crisis Text Line: Text SHOUT to 85258\n' +
         '- Mind Infoline: 0300 123 3393\n\n' +
         'You do not have to face this alone. Speaking to a trained person can make a real difference.';
-      recordChatExchange(sessionId, text, crisis);
-      return res.json({ answer: crisis });
+      await recordChatExchange(sessionId, text, crisis, user?.id ?? null);
+      return res.json({
+        answer: crisis,
+        ...(await guestResponseFlags(sessionId, req, res)),
+      });
     }
 
     // Signed-in users: after 6 Luna replies, the 7th reply is a personalised practitioner suggestion
     if (
       user &&
       botReplyCount === LOGGED_IN_PRACTITIONER_REPLY_AT &&
-      !practitionerSuggestedSessions.has(sessionId)
+      !(await isPractitionerSuggested(sessionId))
     ) {
-      const history = getSessionMessages(sessionId).map((m) => ({
+      const history = (await getSessionMessages(sessionId)).map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
       const reply = await generatePractitionerRecommendation(history, text);
-      recordChatExchange(sessionId, text, reply);
-      practitionerSuggestedSessions.add(sessionId);
+      await recordChatExchange(sessionId, text, reply, user.id);
+      await setPractitionerSuggested(sessionId, user.id);
 
       let audio = null;
       try {
@@ -732,6 +825,7 @@ app.post('/chat', async (req, res) => {
         answer: reply,
         audio,
         practitionerRecommendation: true,
+        ...(await guestResponseFlags(sessionId, req, res)),
       });
     }
 
@@ -739,35 +833,44 @@ app.post('/chat', async (req, res) => {
       const medicalReply =
         'I am not able to provide medical advice or a diagnosis. For anything related to your physical or mental health, it is always best to speak with a qualified healthcare professional who can assess your situation properly.\n\n' +
         'Flowergrid does have doctors and medical practitioners on the team who can support you if that would help. You can reach the team at sk@flowergrid.co.uk or call +44 7432 211096.';
-      recordChatExchange(sessionId, text, medicalReply);
-      return res.json({ answer: medicalReply });
+      await recordChatExchange(sessionId, text, medicalReply, user?.id ?? null);
+      return res.json({
+        answer: medicalReply,
+        ...(await guestResponseFlags(sessionId, req, res)),
+      });
     }
 
     if (detectPricing(text)) {
       const pricingReply =
         'I do not have specific pricing details to hand. The Flowergrid team would be happy to talk you through options, availability and fees.\n\n' +
         'You can contact them by email at sk@flowergrid.co.uk or by phone on +44 7432 211096.';
-      recordChatExchange(sessionId, text, pricingReply);
-      return res.json({ answer: pricingReply });
+      await recordChatExchange(sessionId, text, pricingReply, user?.id ?? null);
+      return res.json({
+        answer: pricingReply,
+        ...(await guestResponseFlags(sessionId, req, res)),
+      });
     }
 
     if (detectMealPlanOrCalories(text)) {
       const dietReply =
         "Because everyone's body is entirely unique, I cannot give you a specific calorie target or medical diagnosis. To do that safely, it is always best to speak with one of our experts who can look at your full health profile.\n\n" +
         'Flowergrid has nutrition specialists such as Rebecca and Dr. Renu who can support you with a personalised plan. You can reach the team at sk@flowergrid.co.uk or call +44 7432 211096.';
-      recordChatExchange(sessionId, text, dietReply);
-      return res.json({ answer: dietReply });
+      await recordChatExchange(sessionId, text, dietReply, user?.id ?? null);
+      return res.json({
+        answer: dietReply,
+        ...(await guestResponseFlags(sessionId, req, res)),
+      });
     }
 
-    const history = getSessionMessages(sessionId).map(m => ({
+    const history = (await getSessionMessages(sessionId)).map((m) => ({
       role: m.role,
-      content: m.content
+      content: m.content,
     }));
 
     const distressFlag = detectDistress(text);
     const reply = await chatWithFlora(history, text, { distressFlag, botReplyCount });
 
-    recordChatExchange(sessionId, text, reply);
+    await recordChatExchange(sessionId, text, reply, user?.id ?? null);
 
     // 🎙 Convert bot reply to voice
     let audio = null;
@@ -778,8 +881,9 @@ app.post('/chat', async (req, res) => {
     }
 
     res.json({
-      answer: reply,   // text reply
-      audio            // base64 mp3 (or null if failed)
+      answer: reply,
+      audio,
+      ...(await guestResponseFlags(sessionId, req, res)),
     });
 
   } catch (err) {
@@ -859,6 +963,15 @@ app.get("/conversations/:id", authenticateUser, async (req, res) => {
       return res.status(404).json({ error: "Conversation not found" });
     }
 
+    if (conversation.sessionId && Array.isArray(conversation.messages)) {
+      await resumeSession(
+        conversation.sessionId,
+        conversation.messages,
+        req.user.id
+      );
+      setChatSessionCookie(res, conversation.sessionId);
+    }
+
     res.json(conversation);
   } catch (err) {
     console.error(err);
@@ -901,12 +1014,14 @@ app.post("/chat/summary", authenticateUser, async (req, res) => {
       return res.status(400).json({ error: "Session ID required" });
     }
 
-    // Use client payload if available (it has full history), otherwise fallback to server context
     let messages = [];
     if (bodyMessages && Array.isArray(bodyMessages) && bodyMessages.length > 0) {
-      messages = bodyMessages;
+      messages = bodyMessages.map((m) => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content,
+      }));
     } else {
-      messages = SUMMARY_CONTEXT.get(sessionId) || [];
+      messages = await getFullSessionMessages(sessionId);
     }
 
     if (!messages.length) {
@@ -950,8 +1065,7 @@ app.post("/chat/summary", authenticateUser, async (req, res) => {
       },
     });
 
-    // 🧹 Clear memory after save
-    SUMMARY_CONTEXT.delete(sessionId);
+    await resumeSession(sessionId, fullConversation, req.user.id);
 
     res.json({ success: true });
   } catch (err) {
@@ -966,6 +1080,109 @@ app.post("/chat/summary", authenticateUser, async (req, res) => {
 });
 
 
+
+app.get('/chat/session/status', async (req, res) => {
+  try {
+    const user = await getRequestUser(req);
+    let sessionId = getChatSessionCookie(req);
+
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      await ensureSession(sessionId, user?.id ?? null);
+    } else {
+      await ensureSession(sessionId, user?.id ?? null);
+    }
+
+    setChatSessionCookie(res, sessionId);
+    const guestLimitReached = await isGuestLimitReached(sessionId, req);
+
+    res.json({ sessionId, guestLimitReached });
+  } catch (err) {
+    console.error('Session status error:', err);
+    res.status(500).json({ error: 'Failed to load session status' });
+  }
+});
+
+app.post('/chat/session/new', async (req, res) => {
+  try {
+    const user = await getRequestUser(req);
+    const previousId = resolveSessionId(req);
+    if (previousId) {
+      await clearSession(previousId);
+    }
+
+    const sessionId = crypto.randomUUID();
+    await ensureSession(sessionId, user?.id ?? null);
+    setChatSessionCookie(res, sessionId);
+
+    const guestLimitReached = await isGuestLimitReached(sessionId, req);
+    res.json({ sessionId, guestLimitReached });
+  } catch (err) {
+    console.error('Session new error:', err);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+app.post('/chat/session/activate', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'sessionId required' });
+    }
+
+    const user = await getRequestUser(req);
+    await ensureSession(sessionId, user?.id ?? null);
+    setChatSessionCookie(res, sessionId);
+
+    const guestLimitReached = await isGuestLimitReached(sessionId, req);
+    res.json({ sessionId, guestLimitReached });
+  } catch (err) {
+    console.error('Session activate error:', err);
+    res.status(500).json({ error: 'Failed to activate session' });
+  }
+});
+
+app.post('/chat/session/resume', async (req, res) => {
+  try {
+    const { sessionId, messages } = req.body;
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId required' });
+    }
+
+    const user = await getRequestUser(req);
+    if (user) {
+      if (messages?.length) {
+        await resumeSession(sessionId, messages, user.id);
+      } else {
+        await syncSessionFromSummary(sessionId, user.id);
+      }
+    } else if (messages?.length) {
+      await resumeSession(sessionId, messages, null);
+    } else {
+      await ensureSession(sessionId, null);
+    }
+
+    setChatSessionCookie(res, sessionId);
+    const guestLimitReached = await isGuestLimitReached(sessionId, req);
+    res.json({ success: true, sessionId, guestLimitReached });
+  } catch (err) {
+    console.error('Session resume error:', err);
+    res.status(500).json({ error: 'Failed to resume session' });
+  }
+});
+
+app.post('/chat/session/reset', async (req, res) => {
+  try {
+    const sessionId = resolveSessionId(req);
+    if (sessionId) {
+      await clearSession(sessionId);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Session reset error:', err);
+    res.status(500).json({ error: 'Failed to reset session' });
+  }
+});
 
 if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
   app.listen(PORT, () => {

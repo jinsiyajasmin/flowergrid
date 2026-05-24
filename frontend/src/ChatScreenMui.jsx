@@ -98,45 +98,56 @@ function TypingIndicator({ bg, color, isAdornment }) {
     );
 }
 
-const SESSION_KEY = "flora_session_id";
-const GUEST_LIMIT_KEY = "flora_guest_limit_reached";
-const GUEST_REPLY_LIMIT = 5;
 const SIGNUP_REQUIRED_MESSAGE =
     "You have used your free messages with Luna.\n\n" +
     "To continue this conversation, please sign up or log in with Google using the Sign up button above. " +
     "Once you are signed in, you can chat with Luna without this limit.\n\n" +
     "Thank you for spending time with me today — I would love to keep supporting you when you are ready.";
 
-function countGuestBotReplies(messages) {
-    return messages.filter((m) => m.from === "bot").length;
+function apiHeaders(userId) {
+    const headers = { "Content-Type": "application/json" };
+    if (userId) headers["x-user-id"] = userId;
+    return headers;
 }
 
-function isGuestLimitReached() {
-    try {
-        return localStorage.getItem(GUEST_LIMIT_KEY) === "true";
-    } catch {
-        return false;
-    }
+async function fetchAuthUser() {
+    const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user ?? null;
 }
 
-function setGuestLimitReached() {
-    try {
-        localStorage.setItem(GUEST_LIMIT_KEY, "true");
-    } catch {
-        /* ignore */
-    }
+async function fetchSessionStatus(userId) {
+    const res = await fetch(`${API_BASE}/chat/session/status`, {
+        credentials: "include",
+        headers: userId ? { "x-user-id": userId } : {},
+    });
+    if (!res.ok) throw new Error("Session status failed");
+    return res.json();
 }
 
-function clearGuestLimitReached() {
-    try {
-        localStorage.removeItem(GUEST_LIMIT_KEY);
-    } catch {
-        /* ignore */
-    }
+async function createServerChatSession(userId, previousSessionId) {
+    const res = await fetch(`${API_BASE}/chat/session/new`, {
+        method: "POST",
+        credentials: "include",
+        headers: apiHeaders(userId),
+        body: JSON.stringify(
+            previousSessionId ? { sessionId: previousSessionId } : {}
+        ),
+    });
+    if (!res.ok) throw new Error("Session create failed");
+    return res.json();
 }
 
-function guestMustSignUp(user) {
-    return !user && isGuestLimitReached();
+async function activateServerChatSession(userId, sessionId) {
+    const res = await fetch(`${API_BASE}/chat/session/activate`, {
+        method: "POST",
+        credentials: "include",
+        headers: apiHeaders(userId),
+        body: JSON.stringify({ sessionId }),
+    });
+    if (!res.ok) throw new Error("Session activate failed");
+    return res.json();
 }
 
 function renderChatText(text, color) {
@@ -163,23 +174,19 @@ function renderChatText(text, color) {
     );
 }
 
-function getOrCreateSessionId() {
+async function resumeServerSession(sessionId, messages, userId) {
+    if (!sessionId) return;
     try {
-        let id = sessionStorage.getItem(SESSION_KEY);
-        if (!id) {
-            if (window.crypto && window.crypto.randomUUID) {
-                id = window.crypto.randomUUID();
-            } else {
-                id =
-                    "sess_" +
-                    Math.random().toString(36).slice(2) +
-                    Date.now().toString(36);
-            }
-            sessionStorage.setItem(SESSION_KEY, id);
-        }
-        return id;
-    } catch {
-        return "sess_fallback";
+        const headers = { "Content-Type": "application/json" };
+        if (userId) headers["x-user-id"] = userId;
+        await fetch(`${API_BASE}/chat/session/resume`, {
+            method: "POST",
+            headers,
+            credentials: "include",
+            body: JSON.stringify({ sessionId, messages }),
+        });
+    } catch (err) {
+        console.warn("Session resume failed", err);
     }
 }
 
@@ -200,6 +207,9 @@ export default function ChatScreenMui() {
     const [signupAnchorEl, setSignupAnchorEl] = useState(null);
     const signupOpen = Boolean(signupAnchorEl);
     const [user, setUser] = useState(null);
+    const [chatSessionId, setChatSessionId] = useState(null);
+    const chatSessionIdRef = useRef(null);
+    const [guestLimitReached, setGuestLimitReached] = useState(false);
 
     const audioRef = useRef(null);
     const [conversations, setConversations] = useState([]);
@@ -233,11 +243,23 @@ export default function ChatScreenMui() {
     const [isListening, setIsListening] = useState(false);
     const recognitionRef = useRef(null);
 
-    // Landing Intro State - Show only once per session
     const [showLanding, setShowLanding] = useState(() => {
-        const hasSeenLanding = sessionStorage.getItem('hasSeenLanding');
-        return !hasSeenLanding;
+        try {
+            return !sessionStorage.getItem("hasSeenLanding");
+        } catch {
+            return true;
+        }
     });
+
+    const applyChatSession = (sessionId, limitReached) => {
+        chatSessionIdRef.current = sessionId;
+        setChatSessionId(sessionId);
+        if (limitReached !== undefined) {
+            setGuestLimitReached(Boolean(limitReached));
+        }
+    };
+
+    const guestMustSignUp = () => !user && guestLimitReached;
 
     // Voice Chat Mode State
     const [voiceModalOpen, setVoiceModalOpen] = useState(false);
@@ -258,18 +280,31 @@ export default function ChatScreenMui() {
     ];
 
     useEffect(() => {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get("token");
-            if (token) {
-                localStorage.setItem("auth_token", token);
-                const url = new URL(window.location.href);
-                url.searchParams.delete("token");
-                window.history.replaceState({}, document.title, url.toString());
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const loadedUser = await fetchAuthUser();
+                if (!cancelled && loadedUser) {
+                    setUser(loadedUser);
+                }
+
+                const status = await fetchSessionStatus(loadedUser?.id);
+                if (!cancelled) {
+                    applyChatSession(status.sessionId, status.guestLimitReached);
+                    if (!loadedUser && status.guestLimitReached) {
+                        setInputDisabled(true);
+                        inputDisabledRef.current = true;
+                    }
+                }
+            } catch (err) {
+                console.warn("App bootstrap failed", err);
             }
-        } catch (err) {
-            console.warn("token read failed", err);
-        }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     useEffect(() => {
@@ -307,50 +342,25 @@ export default function ChatScreenMui() {
     }, [inputDisabled]);
 
     useEffect(() => {
-        if (user) {
-            clearGuestLimitReached();
-            setInputDisabled(false);
-            inputDisabledRef.current = false;
-        } else if (isGuestLimitReached()) {
-            setInputDisabled(true);
-            inputDisabledRef.current = true;
-        }
-    }, [user]);
+        if (!user) return;
 
-    useEffect(() => {
-        try {
-            const params = new URLSearchParams(window.location.search);
-            const userParam = params.get("user");
+        let cancelled = false;
 
-            if (userParam) {
-                const parsedUser = JSON.parse(decodeURIComponent(userParam));
-                localStorage.setItem("flora_user", JSON.stringify(parsedUser));
-                setUser(parsedUser);
-                clearGuestLimitReached();
+        fetchSessionStatus(user.id)
+            .then((status) => {
+                if (cancelled) return;
+                // Signed-in users are never guest-limited; apply session only after fetch.
+                applyChatSession(status.sessionId, false);
+                setGuestLimitReached(false);
                 setInputDisabled(false);
                 inputDisabledRef.current = false;
+            })
+            .catch(console.error);
 
-                const url = new URL(window.location.href);
-                url.searchParams.delete("user");
-                window.history.replaceState({}, document.title, url.toString());
-            } else {
-                const stored = localStorage.getItem("flora_user");
-                if (stored) {
-                    setUser(JSON.parse(stored));
-                    clearGuestLimitReached();
-                    setInputDisabled(false);
-                    inputDisabledRef.current = false;
-                } else if (isGuestLimitReached()) {
-                    setInputDisabled(true);
-                    inputDisabledRef.current = true;
-                }
-            }
-        } catch (err) {
-            console.warn("User restore failed", err);
-        }
-    }, []);
-
-
+        return () => {
+            cancelled = true;
+        };
+    }, [user]);
 
     useEffect(() => {
         const handleBeforeUnload = () => {
@@ -516,7 +526,7 @@ export default function ChatScreenMui() {
     }
 
     function applyGuestSignupBlock(showOnEmptyChat = false) {
-        setGuestLimitReached();
+        setGuestLimitReached(true);
         setInputDisabled(true);
         inputDisabledRef.current = true;
         if (voiceModeActive) stopVoiceMode();
@@ -536,15 +546,21 @@ export default function ChatScreenMui() {
         });
     }
 
+    async function ensureChatSessionId() {
+        if (chatSessionIdRef.current) return chatSessionIdRef.current;
+        const status = await fetchSessionStatus(user?.id);
+        applyChatSession(status.sessionId, status.guestLimitReached);
+        if (!user && status.guestLimitReached) {
+            setInputDisabled(true);
+            inputDisabledRef.current = true;
+        }
+        return status.sessionId;
+    }
+
     async function sendToServer(text, isVoiceInput = false) {
 
         if (!text) return;
-        if (inputDisabledRef.current || guestMustSignUp(user)) {
-            applyGuestSignupBlock();
-            return;
-        }
-
-        if (!user && countGuestBotReplies(messages) >= GUEST_REPLY_LIMIT) {
+        if (inputDisabledRef.current || guestMustSignUp()) {
             applyGuestSignupBlock();
             return;
         }
@@ -556,29 +572,37 @@ export default function ChatScreenMui() {
             interruptBotResponse();
         }
 
+        let sessionId;
+        try {
+            sessionId = await ensureChatSessionId();
+        } catch (err) {
+            console.error("session error", err);
+            return;
+        }
+
+        if (guestMustSignUp()) {
+            applyGuestSignupBlock();
+            return;
+        }
+
         setConversationMode(true);
         setMessages((m) => [...m, { id: Date.now(), from: "user", text }]);
         setSending(true);
 
-        const sessionId = getOrCreateSessionId();
-
         try {
             chatAbortRef.current = new AbortController();
 
-            const headers = { "Content-Type": "application/json" };
-            if (user?.id) headers["x-user-id"] = user.id;
+            const headers = apiHeaders(user?.id);
 
             const resp = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
                 headers,
-                credentials: "include", // Ensure session cookies are sent
+                credentials: "include",
                 signal: chatAbortRef.current.signal,
                 body: JSON.stringify({
                     message: text,
                     sessionId,
                 }),
-
-
             });
 
             const raw = await resp.text();
@@ -624,11 +648,12 @@ export default function ChatScreenMui() {
                 }
             }, 15); // Adjust speed here
 
-            if (data?.disableInput) {
-                setGuestLimitReached();
+            if (data?.disableInput || data?.guestLimitReached) {
+                setGuestLimitReached(true);
                 setInputDisabled(true);
                 inputDisabledRef.current = true;
                 if (voiceModeActive) stopVoiceMode();
+                applyGuestSignupBlock();
             }
 
             if (data?.audio && isVoiceInput) {
@@ -659,9 +684,7 @@ export default function ChatScreenMui() {
     }
 
     async function startNewChat() {
-        // Guest used free messages — new chat still requires sign up
-        if (guestMustSignUp(user)) {
-            sessionStorage.removeItem(SESSION_KEY);
+        if (guestMustSignUp()) {
             setActiveConversationId(null);
             setConversationMode(true);
             setInput("");
@@ -669,41 +692,65 @@ export default function ChatScreenMui() {
             return;
         }
 
-        // 🔥 Capture current state for background saving
         const currentMessages = [...messages];
-        const currentSessionId = sessionStorage.getItem(SESSION_KEY);
+        const currentSessionId = chatSessionIdRef.current;
 
-        // 🔥 OPTIMISTIC UI: Clear screen immediately
-        sessionStorage.removeItem(SESSION_KEY);
+        if (user && currentMessages.length > 0 && currentSessionId) {
+            try {
+                await sendChatSummary(currentMessages, currentSessionId);
+                const listRes = await fetch(`${API_BASE}/conversations`, {
+                    credentials: "include",
+                    headers: { "x-user-id": user.id },
+                });
+                if (listRes.ok) {
+                    const data = await listRes.json();
+                    if (Array.isArray(data)) setConversations(data);
+                }
+            } catch (err) {
+                console.warn("Background summary failed", err);
+            }
+        }
+
+        let sessionData;
+        try {
+            sessionData = await createServerChatSession(user?.id, currentSessionId);
+        } catch (err) {
+            console.warn("New session failed", err);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    id: Date.now(),
+                    from: "bot",
+                    text: "I could not start a new chat just now. Please try again in a moment.",
+                },
+            ]);
+            return;
+        }
+
+        if (!sessionData?.sessionId) {
+            console.warn("New session failed: missing sessionId");
+            return;
+        }
+
+        const guestLimited = Boolean(sessionData.guestLimitReached);
+        applyChatSession(sessionData.sessionId, guestLimited);
+
         setMessages([]);
         setActiveConversationId(null);
         setConversationMode(false);
-        setInputDisabled(false);
-        inputDisabledRef.current = false;
-
-        // 🔥 Save history in background (don't await here for instant feel)
-        if (user && currentMessages.length > 0 && currentSessionId) {
-            sendChatSummary(currentMessages, currentSessionId)
-                .then(() => {
-                    // Refresh history after background save completes
-                    fetch(`${API_BASE}/conversations`, {
-                        credentials: "include",
-                        headers: { 'x-user-id': user.id }
-                    })
-                        .then(res => res.ok && res.json())
-                        .then(data => { if (Array.isArray(data)) setConversations(data) })
-                        .catch(console.error);
-                })
-                .catch(err => console.warn("Background summary failed", err));
+        setGuestLimitReached(guestLimited);
+        setInputDisabled(guestLimited);
+        inputDisabledRef.current = guestLimited;
+        if (guestLimited) {
+            applyGuestSignupBlock(true);
         }
     }
 
     function openConversation(conversation) {
         // 🔥 Capture current state for background saving
         const currentMessages = [...messages];
-        const currentSessionId = sessionStorage.getItem("flora_session_id");
+        const currentSessionId = chatSessionIdRef.current;
 
-        // 🔥 Save current chat in background before switching (if not just opening same one)
         if (user && currentMessages.length > 0 && currentSessionId && activeConversationId !== conversation.id) {
             sendChatSummary(currentMessages, currentSessionId)
                 .then(() => {
@@ -719,7 +766,7 @@ export default function ChatScreenMui() {
                 .catch(err => console.warn("Background summary failed", err));
         }
 
-        if (inputDisabled && activeConversationId !== conversation.id && !guestMustSignUp(user)) {
+        if (inputDisabled && activeConversationId !== conversation.id && !guestMustSignUp()) {
             setInputDisabled(false);
             inputDisabledRef.current = false;
         }
@@ -732,17 +779,32 @@ export default function ChatScreenMui() {
             headers: { 'x-user-id': user.id }
         })
             .then((res) => res.json())
-            .then((data) => {
-                // Resume session if sessionId exists
+            .then(async (data) => {
+                const loaded = Array.isArray(data.messages)
+                    ? data.messages.map((m, i) => ({
+                          id: i,
+                          from: m.role === "user" ? "user" : "bot",
+                          text: m.content,
+                      }))
+                    : [];
+
                 if (data.sessionId) {
-                    sessionStorage.setItem("flora_session_id", data.sessionId);
+                    const activated = await activateServerChatSession(
+                        user?.id,
+                        data.sessionId
+                    );
+                    applyChatSession(
+                        activated.sessionId,
+                        user ? false : activated.guestLimitReached
+                    );
+                    await resumeServerSession(
+                        data.sessionId,
+                        data.messages || [],
+                        user?.id
+                    );
                 }
 
-                setMessages(Array.isArray(data.messages) ? data.messages.map((m, i) => ({
-                    id: i,
-                    from: m.role === 'user' ? 'user' : 'bot',
-                    text: m.content
-                })) : []);
+                setMessages(loaded);
             })
             .catch(console.error);
     }
@@ -821,7 +883,7 @@ export default function ChatScreenMui() {
     async function sendChatSummary(overrideMessages = null, overrideSessionId = null) {
         try {
             const msgsToSave = overrideMessages || messages;
-            const sidToSave = overrideSessionId || sessionStorage.getItem("flora_session_id");
+            const sidToSave = overrideSessionId || chatSessionIdRef.current;
 
             if (!user || !msgsToSave.length || !sidToSave) return;
 
@@ -857,16 +919,12 @@ export default function ChatScreenMui() {
             audioRef.current = null;
         }
 
-        if (inputDisabledRef.current || guestMustSignUp(user)) {
+        if (inputDisabledRef.current || guestMustSignUp()) {
             applyGuestSignupBlock();
             return;
         }
 
         const trimmed = input.trim();
-        if (!user && countGuestBotReplies(messages) >= GUEST_REPLY_LIMIT) {
-            applyGuestSignupBlock();
-            return;
-        }
         if (!trimmed) return;
 
         setLastInputWasVoice(false); // 👈 typed input
@@ -887,32 +945,48 @@ export default function ChatScreenMui() {
 
     async function handleLogout() {
         try {
-            await sendChatSummary(); // 🔥 save summary before logout
+            await sendChatSummary();
         } catch (e) {
             console.warn("Summary save failed on logout", e);
         }
 
-        localStorage.removeItem("flora_user");
-        sessionStorage.removeItem("flora_session_id");
-
         try {
-            await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
-        } catch (e) { }
+            await fetch(`${API_BASE}/auth/logout`, {
+                method: "POST",
+                credentials: "include",
+            });
+        } catch (e) {
+            console.warn("Logout failed", e);
+        }
+
+        // Resolve fresh guest session from API before clearing user, so
+        // guestMustSignUp() and inputDisabled are not stuck until a refresh.
+        let guestLimited = false;
+        try {
+            const status = await fetchSessionStatus();
+            applyChatSession(status.sessionId, status.guestLimitReached);
+            guestLimited = Boolean(status.guestLimitReached);
+        } catch (err) {
+            console.warn("Post-logout session status failed", err);
+            setGuestLimitReached(false);
+        }
+
+        setGuestLimitReached(guestLimited);
+        setInputDisabled(guestLimited);
+        inputDisabledRef.current = guestLimited;
 
         setUser(null);
         setMessages([]);
+        setConversations([]);
         setConversationMode(false);
         setActiveConversationId(null);
-        clearGuestLimitReached();
-        setInputDisabled(false);
-        inputDisabledRef.current = false;
         handleSignupClose();
     }
 
     function handleMicClick() {
         const recognition = recognitionRef.current;
 
-        if (inputDisabledRef.current || guestMustSignUp(user)) {
+        if (inputDisabledRef.current || guestMustSignUp()) {
             applyGuestSignupBlock();
             return;
         }
@@ -1041,12 +1115,6 @@ export default function ChatScreenMui() {
             }
         }
     }, [isListening, voiceModeActive]); // Runs when listening state changes
-
-    useEffect(() => {
-        const handler = () => sendChatSummary();
-        window.addEventListener("beforeunload", handler);
-        return () => window.removeEventListener("beforeunload", handler);
-    }, []);
 
     const quickTopics = [
         "Analyse my personality",
@@ -1419,10 +1487,16 @@ export default function ChatScreenMui() {
 
                 {/* Landing Intro Animation */}
                 {showLanding && (
-                    <LandingIntro onComplete={() => {
-                        sessionStorage.setItem('hasSeenLanding', 'true');
-                        setShowLanding(false);
-                    }} />
+                    <LandingIntro
+                        onComplete={() => {
+                            try {
+                                sessionStorage.setItem("hasSeenLanding", "true");
+                            } catch {
+                                /* ignore */
+                            }
+                            setShowLanding(false);
+                        }}
+                    />
                 )}
 
                 <style>{`@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');`}</style>
