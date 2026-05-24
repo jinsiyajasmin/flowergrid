@@ -33,11 +33,7 @@ import flowerGridLogo from "../assets/flower.png";
 import flower from "../assets/flowergrid_logo_text.png";
 import PeopleIcon from "../assets/none.png";
 import AnimatedDashboardIcon from "./components/AnimatedDashboardIcon";
-
-
-
-
-const API_BASE = "https://flowergrid-7mw2.vercel.app";
+import { API_BASE } from "./config";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
@@ -437,7 +433,7 @@ export default function AdminDashboard() {
                 {usersForTable.map((item) => (
 
                   <Card
-                    key={item._id}
+                    key={item.id}
                     sx={{
                       mb: 2,
                       p: 2,
@@ -517,7 +513,7 @@ export default function AdminDashboard() {
                     {usersForTable.map((item, index) => (
 
                       <TableRow
-                        key={item._id}
+                        key={item.id}
                         sx={{
                           bgcolor: "#EAD1A8",
                           "&:hover": {
@@ -625,7 +621,7 @@ export default function AdminDashboard() {
         </DialogTitle>
         <DialogContent dividers sx={{ bgcolor: "white" }}>
           {selectedSummary?.map((item, index) => (
-            <Box key={item._id} sx={{ mb: 3 }}>
+            <Box key={item.id} sx={{ mb: 3 }}>
               <Typography
                 variant="caption"
                 sx={{ color: "#8B7355", display: "block", mb: 1 }}

@@ -28,6 +28,7 @@ import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
 import ScaleLetterText from "./components/ScaleLetterText";
+import { API_BASE } from "./config";
 import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
@@ -35,6 +36,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import chatIcon from "../assets/chat.svg";
 import testIcon from "../assets/test.svg";
 import bookIcon from "../assets/book.svg";
@@ -42,8 +44,9 @@ import worksheetsIcon from "../assets/worksheets.svg";
 import flowerLogo from "../assets/flower.png";
 import SendIcon from "../assets/icon.svg";
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
-import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import LandingIntro from "./components/LandingIntro";
+import VoiceWaveformOverlay from "./components/VoiceWaveformOverlay";
+import AnimatedVoiceIcon from "./components/AnimatedVoiceIcon";
 
 
 
@@ -96,6 +99,69 @@ function TypingIndicator({ bg, color, isAdornment }) {
 }
 
 const SESSION_KEY = "flora_session_id";
+const GUEST_LIMIT_KEY = "flora_guest_limit_reached";
+const GUEST_REPLY_LIMIT = 5;
+const SIGNUP_REQUIRED_MESSAGE =
+    "You have used your free messages with Luna.\n\n" +
+    "To continue this conversation, please sign up or log in with Google using the Sign up button above. " +
+    "Once you are signed in, you can chat with Luna without this limit.\n\n" +
+    "Thank you for spending time with me today — I would love to keep supporting you when you are ready.";
+
+function countGuestBotReplies(messages) {
+    return messages.filter((m) => m.from === "bot").length;
+}
+
+function isGuestLimitReached() {
+    try {
+        return localStorage.getItem(GUEST_LIMIT_KEY) === "true";
+    } catch {
+        return false;
+    }
+}
+
+function setGuestLimitReached() {
+    try {
+        localStorage.setItem(GUEST_LIMIT_KEY, "true");
+    } catch {
+        /* ignore */
+    }
+}
+
+function clearGuestLimitReached() {
+    try {
+        localStorage.removeItem(GUEST_LIMIT_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+function guestMustSignUp(user) {
+    return !user && isGuestLimitReached();
+}
+
+function renderChatText(text, color) {
+    const parts = String(text).split(/(https?:\/\/[^\s]+)/g);
+    return (
+        <Typography variant="body1" component="div" sx={{ color, whiteSpace: "pre-wrap" }}>
+            {parts.map((part, i) =>
+                /^https?:\/\//.test(part) ? (
+                    <Box
+                        key={i}
+                        component="a"
+                        href={part}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ color: "inherit", textDecoration: "underline", wordBreak: "break-all" }}
+                    >
+                        {part}
+                    </Box>
+                ) : (
+                    <span key={i}>{part}</span>
+                )
+            )}
+        </Typography>
+    );
+}
 
 function getOrCreateSessionId() {
     try {
@@ -140,10 +206,10 @@ export default function ChatScreenMui() {
     const [activeConversationId, setActiveConversationId] = useState(null);
     const [lastInputWasVoice, setLastInputWasVoice] = useState(false);
     const [inputDisabled, setInputDisabled] = useState(false);
+    const inputDisabledRef = useRef(false);
     const [voiceTranscript, setVoiceTranscript] = useState(""); // temp transcript
     const voiceTranscriptRef = useRef(""); // Ref for accessing inside callbacks
-    const [isSpeaking, setIsSpeaking] = useState(false); // For animation toggle
-
+    const [isSpeaking, setIsSpeaking] = useState(false);
     const summarySentRef = useRef(false);
 
 
@@ -178,6 +244,9 @@ export default function ChatScreenMui() {
     const [voiceModeActive, setVoiceModeActive] = useState(false);
     const continuousListeningRef = useRef(false); // Ref to track if we should restart listening
     const silenceTimerRef = useRef(null); // Ref for 3s silence timeout
+    const typingIntervalRef = useRef(null);
+    const chatAbortRef = useRef(null);
+    const isBotSpeakingRef = useRef(false);
 
 
 
@@ -187,9 +256,6 @@ export default function ChatScreenMui() {
         { icon: bookIcon, label: "Book a Therapist" },
         { icon: worksheetsIcon, label: "Worksheets" },
     ];
-
-
-    const API_BASE = "https://flowergrid-7mw2.vercel.app";
 
     useEffect(() => {
         try {
@@ -237,6 +303,21 @@ export default function ChatScreenMui() {
     }, [messages, sending, conversationMode]);
 
     useEffect(() => {
+        inputDisabledRef.current = inputDisabled;
+    }, [inputDisabled]);
+
+    useEffect(() => {
+        if (user) {
+            clearGuestLimitReached();
+            setInputDisabled(false);
+            inputDisabledRef.current = false;
+        } else if (isGuestLimitReached()) {
+            setInputDisabled(true);
+            inputDisabledRef.current = true;
+        }
+    }, [user]);
+
+    useEffect(() => {
         try {
             const params = new URLSearchParams(window.location.search);
             const userParam = params.get("user");
@@ -245,13 +326,24 @@ export default function ChatScreenMui() {
                 const parsedUser = JSON.parse(decodeURIComponent(userParam));
                 localStorage.setItem("flora_user", JSON.stringify(parsedUser));
                 setUser(parsedUser);
+                clearGuestLimitReached();
+                setInputDisabled(false);
+                inputDisabledRef.current = false;
 
                 const url = new URL(window.location.href);
                 url.searchParams.delete("user");
                 window.history.replaceState({}, document.title, url.toString());
             } else {
                 const stored = localStorage.getItem("flora_user");
-                if (stored) setUser(JSON.parse(stored));
+                if (stored) {
+                    setUser(JSON.parse(stored));
+                    clearGuestLimitReached();
+                    setInputDisabled(false);
+                    inputDisabledRef.current = false;
+                } else if (isGuestLimitReached()) {
+                    setInputDisabled(true);
+                    inputDisabledRef.current = true;
+                }
             }
         } catch (err) {
             console.warn("User restore failed", err);
@@ -291,20 +383,14 @@ export default function ChatScreenMui() {
         recognition.maxAlternatives = 3; // Get more alternatives for better accuracy
 
 
-        recognition.onsoundstart = () => {
-            // Some browsers fire this when any sound is detected
-            setIsSpeaking(true);
-        };
-        recognition.onsoundend = () => {
-            setIsSpeaking(false);
-        };
-        // Fallback or additional check using speechstart/end if soundstart isn't reliable
+        recognition.onsoundstart = () => setIsSpeaking(true);
+        recognition.onsoundend = () => setIsSpeaking(false);
         recognition.onspeechstart = () => setIsSpeaking(true);
         recognition.onspeechend = () => setIsSpeaking(false);
 
         recognition.onstart = () => {
             setIsListening(true);
-            setIsSpeaking(false); // Reset
+            setIsSpeaking(false);
 
             // Clear any stale timer
             if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
@@ -369,6 +455,7 @@ export default function ChatScreenMui() {
             if (currentTranscript) {
                 setVoiceTranscript(currentTranscript);
                 voiceTranscriptRef.current = currentTranscript;
+                setIsSpeaking(true);
             }
 
             // Log interim for debugging if needed
@@ -398,9 +485,77 @@ export default function ChatScreenMui() {
         };
     }, []);
 
+    function resumeVoiceListening() {
+        if (!continuousListeningRef.current) return;
+        const recognition = recognitionRef.current;
+        if (!recognition) return;
+        try {
+            recognition.start();
+            setIsListening(true);
+        } catch {
+            // Already listening
+        }
+    }
+
+    function interruptBotResponse() {
+        chatAbortRef.current?.abort();
+        chatAbortRef.current = null;
+
+        if (typingIntervalRef.current) {
+            clearInterval(typingIntervalRef.current);
+            typingIntervalRef.current = null;
+        }
+
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.onended = null;
+            audioRef.current = null;
+        }
+        isBotSpeakingRef.current = false;
+        setSending(false);
+    }
+
+    function applyGuestSignupBlock(showOnEmptyChat = false) {
+        setGuestLimitReached();
+        setInputDisabled(true);
+        inputDisabledRef.current = true;
+        if (voiceModeActive) stopVoiceMode();
+
+        setMessages((prev) => {
+            const hasSignupMsg = prev.some(
+                (m) => m.from === "bot" && m.text === SIGNUP_REQUIRED_MESSAGE
+            );
+            if (hasSignupMsg) return prev;
+            if (showOnEmptyChat && prev.length === 0) {
+                return [{ id: Date.now(), from: "bot", text: SIGNUP_REQUIRED_MESSAGE }];
+            }
+            return [
+                ...prev,
+                { id: Date.now() + 1, from: "bot", text: SIGNUP_REQUIRED_MESSAGE },
+            ];
+        });
+    }
+
     async function sendToServer(text, isVoiceInput = false) {
 
         if (!text) return;
+        if (inputDisabledRef.current || guestMustSignUp(user)) {
+            applyGuestSignupBlock();
+            return;
+        }
+
+        if (!user && countGuestBotReplies(messages) >= GUEST_REPLY_LIMIT) {
+            applyGuestSignupBlock();
+            return;
+        }
+
+        if (
+            isVoiceInput &&
+            (sending || isBotSpeakingRef.current || audioRef.current)
+        ) {
+            interruptBotResponse();
+        }
+
         setConversationMode(true);
         setMessages((m) => [...m, { id: Date.now(), from: "user", text }]);
         setSending(true);
@@ -408,13 +563,16 @@ export default function ChatScreenMui() {
         const sessionId = getOrCreateSessionId();
 
         try {
+            chatAbortRef.current = new AbortController();
 
+            const headers = { "Content-Type": "application/json" };
+            if (user?.id) headers["x-user-id"] = user.id;
 
             const resp = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 credentials: "include", // Ensure session cookies are sent
-
+                signal: chatAbortRef.current.signal,
                 body: JSON.stringify({
                     message: text,
                     sessionId,
@@ -450,7 +608,8 @@ export default function ChatScreenMui() {
             setMessages((prev) => [...prev, { id: botMsgId, from: "bot", text: "" }]);
 
             let i = 0;
-            const typingInterval = setInterval(() => {
+            if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+            typingIntervalRef.current = setInterval(() => {
                 if (i < reply.length) {
                     const nextChar = reply.charAt(i);
                     setMessages((prev) =>
@@ -460,13 +619,16 @@ export default function ChatScreenMui() {
                     );
                     i++;
                 } else {
-                    clearInterval(typingInterval);
+                    clearInterval(typingIntervalRef.current);
+                    typingIntervalRef.current = null;
                 }
             }, 15); // Adjust speed here
 
-            // Check for guest limit flag
             if (data?.disableInput) {
+                setGuestLimitReached();
                 setInputDisabled(true);
+                inputDisabledRef.current = true;
+                if (voiceModeActive) stopVoiceMode();
             }
 
             if (data?.audio && isVoiceInput) {
@@ -477,6 +639,7 @@ export default function ChatScreenMui() {
 
 
         } catch (err) {
+            if (err.name === "AbortError") return;
             console.error("chat error", err);
             setMessages((m) => [
                 ...m,
@@ -487,21 +650,36 @@ export default function ChatScreenMui() {
                 },
             ]);
         } finally {
+            chatAbortRef.current = null;
             setSending(false);
+            if (continuousListeningRef.current) {
+                resumeVoiceListening();
+            }
         }
     }
 
     async function startNewChat() {
+        // Guest used free messages — new chat still requires sign up
+        if (guestMustSignUp(user)) {
+            sessionStorage.removeItem(SESSION_KEY);
+            setActiveConversationId(null);
+            setConversationMode(true);
+            setInput("");
+            applyGuestSignupBlock(true);
+            return;
+        }
+
         // 🔥 Capture current state for background saving
         const currentMessages = [...messages];
-        const currentSessionId = sessionStorage.getItem("flora_session_id");
+        const currentSessionId = sessionStorage.getItem(SESSION_KEY);
 
         // 🔥 OPTIMISTIC UI: Clear screen immediately
-        sessionStorage.removeItem("flora_session_id");
+        sessionStorage.removeItem(SESSION_KEY);
         setMessages([]);
         setActiveConversationId(null);
         setConversationMode(false);
         setInputDisabled(false);
+        inputDisabledRef.current = false;
 
         // 🔥 Save history in background (don't await here for instant feel)
         if (user && currentMessages.length > 0 && currentSessionId) {
@@ -520,139 +698,13 @@ export default function ChatScreenMui() {
         }
     }
 
-    function VoiceWaveformOverlay({ onConfirm, onCancel, isSpeaking }) {
-        const [modulation, setModulation] = useState(Array(24).fill(1));
-
-        useEffect(() => {
-            if (!isSpeaking) {
-                setModulation(Array(24).fill(1));
-                return;
-            }
-
-            const interval = setInterval(() => {
-                setModulation(prev => prev.map(() => 0.5 + Math.random() * 1.5));
-            }, 100);
-
-            return () => clearInterval(interval);
-        }, [isSpeaking]);
-
-        return (
-            <Box
-                sx={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: "28px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    px: 1,
-                    background: "#DBC094", // MATCH INPUT BG
-                    zIndex: 10,
-                }}
-            >
-                {/* Center Waveform Area */}
-                <Box sx={{ flex: 1, position: "relative", height: "100%", ml: 2, mr: 1, display: "flex", alignItems: "center" }}>
-                    {/* Dotted Line - Always there */}
-                    <Box
-                        sx={{
-                            position: "absolute",
-                            left: 0,
-                            right: 0,
-                            height: 2,
-                            background: "radial-gradient(circle, rgba(255, 255, 255, 0.4) 1px, transparent 1px)",
-                            backgroundSize: "6px 2px",
-                            backgroundRepeat: "repeat-x",
-                            opacity: 0.6,
-                            maskImage: "linear-gradient(to right, transparent, black 10%, black 90%, transparent)",
-                            animation: !isSpeaking ? "marquee 3s linear infinite" : "none",
-                        }}
-                    />
-
-
-                    {isSpeaking && (
-                        <Box
-                            sx={{
-                                display: "flex",
-                                gap: "2px",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: "100%",
-                                zIndex: 1,
-                            }}
-                        >
-                            {[...Array(24)].map((_, i) => (
-                                <Box
-                                    key={i}
-                                    sx={{
-                                        width: 2,
-                                        height: `${8 * (modulation[i] || 1)}px`,
-                                        borderRadius: 2,
-                                        backgroundColor: "#ffffff",
-                                        transition: "height 0.1s ease-in-out",
-                                        animation: "wavePulse 1.2s infinite ease-in-out",
-                                        animationDelay: `${(23 - i) * 0.05}s`, // Move from right to left (originating from icons)
-                                    }}
-                                />
-                            ))}
-                        </Box>
-                    )}
-                </Box>
-
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1, pr: 0.5 }}>
-                    <IconButton
-                        onClick={onCancel}
-                        size="small"
-                        sx={{
-                            color: "#fff",
-                            bgcolor: "rgba(0,0,0,0.15)",
-                            width: 36,
-                            height: 36,
-                            "&:hover": { bgcolor: "rgba(0,0,0,0.3)" }
-                        }}
-                    >
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
-
-                    <IconButton
-                        onClick={onConfirm}
-                        size="small"
-                        sx={{
-                            bgcolor: "rgba(80, 57, 32, 0.6)",
-
-                            color: "#fff",
-                            width: 32,
-                            height: 32,
-                            "&:hover": { bgcolor: "rgba(153, 86, 15, 0.6)" }
-                        }}
-                    >
-                        <CheckIcon fontSize="small" />
-                    </IconButton>
-                </Box>
-
-                <style>{`
-        @keyframes wavePulse {
-          0%, 100% {
-            opacity: 0.5;
-          }
-          50% {
-            opacity: 1;
-          }
-        }
-        @keyframes marquee {
-            0% { background-position: 0 0; }
-            100% { background-position: 24px 0; }
-        }
-      `}</style>
-            </Box >
-        );
-    }
     function openConversation(conversation) {
         // 🔥 Capture current state for background saving
         const currentMessages = [...messages];
         const currentSessionId = sessionStorage.getItem("flora_session_id");
 
         // 🔥 Save current chat in background before switching (if not just opening same one)
-        if (user && currentMessages.length > 0 && currentSessionId && activeConversationId !== conversation._id) {
+        if (user && currentMessages.length > 0 && currentSessionId && activeConversationId !== conversation.id) {
             sendChatSummary(currentMessages, currentSessionId)
                 .then(() => {
                     // Refresh history list so newly saved title appears
@@ -667,14 +719,15 @@ export default function ChatScreenMui() {
                 .catch(err => console.warn("Background summary failed", err));
         }
 
-        if (inputDisabled && activeConversationId !== conversation._id) {
+        if (inputDisabled && activeConversationId !== conversation.id && !guestMustSignUp(user)) {
             setInputDisabled(false);
+            inputDisabledRef.current = false;
         }
 
-        setActiveConversationId(conversation._id);
+        setActiveConversationId(conversation.id);
         setConversationMode(true);
 
-        fetch(`${API_BASE}/conversations/${conversation._id}`, {
+        fetch(`${API_BASE}/conversations/${conversation.id}`, {
             credentials: "include",
             headers: { 'x-user-id': user.id }
         })
@@ -710,7 +763,7 @@ export default function ChatScreenMui() {
             });
 
             if (res.ok) {
-                setConversations(prev => prev.filter(c => c._id !== idToDelete));
+                setConversations(prev => prev.filter(c => c.id !== idToDelete));
                 if (activeConversationId === idToDelete) {
                     startNewChat();
                 }
@@ -726,20 +779,42 @@ export default function ChatScreenMui() {
 
     function playBotVoice(base64Audio) {
         try {
-            // Stop previous audio if any
             if (audioRef.current) {
                 audioRef.current.pause();
+                audioRef.current.onended = null;
                 audioRef.current = null;
             }
 
             const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
             audioRef.current = audio;
 
-            audio.play().catch(err => {
+            audio.onplay = () => {
+                isBotSpeakingRef.current = true;
+            };
+
+            audio.onended = () => {
+                isBotSpeakingRef.current = false;
+                audioRef.current = null;
+                if (continuousListeningRef.current) {
+                    resumeVoiceListening();
+                }
+            };
+
+            audio.onerror = () => {
+                isBotSpeakingRef.current = false;
+                audioRef.current = null;
+            };
+
+            audio.play().catch((err) => {
                 console.warn("Autoplay blocked:", err);
+                isBotSpeakingRef.current = false;
+                if (continuousListeningRef.current) {
+                    resumeVoiceListening();
+                }
             });
         } catch (err) {
             console.error("Audio play failed:", err);
+            isBotSpeakingRef.current = false;
         }
     }
 
@@ -782,9 +857,16 @@ export default function ChatScreenMui() {
             audioRef.current = null;
         }
 
-        if (inputDisabled) return;
+        if (inputDisabledRef.current || guestMustSignUp(user)) {
+            applyGuestSignupBlock();
+            return;
+        }
 
         const trimmed = input.trim();
+        if (!user && countGuestBotReplies(messages) >= GUEST_REPLY_LIMIT) {
+            applyGuestSignupBlock();
+            return;
+        }
         if (!trimmed) return;
 
         setLastInputWasVoice(false); // 👈 typed input
@@ -821,14 +903,19 @@ export default function ChatScreenMui() {
         setMessages([]);
         setConversationMode(false);
         setActiveConversationId(null);
+        clearGuestLimitReached();
         setInputDisabled(false);
+        inputDisabledRef.current = false;
         handleSignupClose();
     }
 
     function handleMicClick() {
         const recognition = recognitionRef.current;
 
-        if (inputDisabled) return;
+        if (inputDisabledRef.current || guestMustSignUp(user)) {
+            applyGuestSignupBlock();
+            return;
+        }
 
         if (!recognition) {
             alert("Speech recognition is not supported in this browser.");
@@ -919,56 +1006,17 @@ export default function ChatScreenMui() {
         if (recognition) recognition.stop();
         setIsListening(false);
 
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current = null;
-        }
+        interruptBotResponse();
     }
 
-    // Use this modified sendToServer for voice mode to auto-resume listening
-    // We already have sendToServer, but we need to ensure the `finally` block or `playBotVoice` 
-    // knows to restart listening if `continuousListeningRef.current` is true.
-    // Ideally, we hook into `playBotVoice` or creating a specialized effect.
-    // For simplicity, let's add a "onAudioEnd" callback to `playBotVoice`.
-
-    function playBotVoice(base64Audio) {
-        try {
-            if (audioRef.current) {
-                audioRef.current.pause();
-                audioRef.current = null;
-            }
-
-            const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
-            audioRef.current = audio;
-
-            audio.onended = () => {
-                if (continuousListeningRef.current) {
-                    // Resume listening after bot finishes speaking
-                    const recognition = recognitionRef.current;
-                    if (recognition) {
-                        try {
-                            recognition.start();
-                            setIsListening(true);
-                        } catch (e) { console.warn("Restart listening failed", e) }
-                    }
-                }
-            };
-
-            audio.play().catch(err => {
-                console.warn("Autoplay blocked:", err);
-            });
-        } catch (err) {
-            console.error("Audio play failed:", err);
+    // Interrupt Luna when user speaks during bot reply (voice chat mode)
+    useEffect(() => {
+        if (!voiceModeActive || !isSpeaking) return;
+        if (sending || isBotSpeakingRef.current || audioRef.current) {
+            interruptBotResponse();
+            resumeVoiceListening();
         }
-    }
-
-    // Also need to handle "silence" auto-send in Voice Mode?
-    // The user requirement: "until the user clicks that wave with end icon". 
-    // Usually this implies "Speak -> Silence -> Send -> Reply -> Speak again".
-    // We need to detect when user stops speaking to auto-send.
-    // existing `recognition.onend` is key.
-
-
+    }, [isSpeaking, voiceModeActive, sending]);
 
     // --- Effect to handle End of Speech in Voice Mode ---
     useEffect(() => {
@@ -983,21 +1031,12 @@ export default function ChatScreenMui() {
                 setVoiceTranscript("");
                 voiceTranscriptRef.current = "";
 
-                // Send
+                // Send — mic stays open so user can speak again during Luna's reply
                 sendToServer(formatted, true);
+                setTimeout(() => resumeVoiceListening(), 80);
             } else {
-                // Recognition stopped but no text (silence timeout).
-                // If we are still in voice mode, we should restart listening?
-                // CAREFUL: Infinite loop of start/stop if error.
-                // Maybe wait a bit?
                 if (continuousListeningRef.current) {
-                    const recognition = recognitionRef.current;
-                    if (recognition) {
-                        try {
-                            recognition.start();
-                            setIsListening(true);
-                        } catch (e) {/* ignore */ }
-                    }
+                    resumeVoiceListening();
                 }
             }
         }
@@ -1017,7 +1056,13 @@ export default function ChatScreenMui() {
         "I am bored",
     ];
 
-    const sidebarWidth = 270;
+    const SIDEBAR_WIDTH_EXPANDED = 270;
+    const SIDEBAR_WIDTH_COLLAPSED = 76;
+    const sidebarWidth = isMobile
+        ? SIDEBAR_WIDTH_EXPANDED
+        : collapsed
+            ? SIDEBAR_WIDTH_COLLAPSED
+            : SIDEBAR_WIDTH_EXPANDED;
 
     const renderSidebarContent = (isDesktop = true) => (
         <Box sx={{
@@ -1047,23 +1092,41 @@ export default function ChatScreenMui() {
             )}
 
             {isDesktop && (
-                <>
-                    <img src={flowerLogo} alt="logo" style={{ width: collapsed ? 46 : 52, height: "auto", transition: "width 0.3s" }} />
+                <Box
+                    sx={{
+                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 1.5,
+                    }}
+                >
+                    <img
+                        src={flowerLogo}
+                        alt="logo"
+                        style={{
+                            width: collapsed ? 40 : 52,
+                            height: "auto",
+                            transition: "width 0.3s ease",
+                        }}
+                    />
 
                     <IconButton
                         onClick={() => setCollapsed(!collapsed)}
+                        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                         sx={{
                             bgcolor: "#F7EEDB",
                             color: SIDEBAR_BG,
                             width: 44,
                             height: 44,
+                            flexShrink: 0,
                             "&:hover": { bgcolor: "#F3E5CB" },
-                            transition: "all 0.3s"
+                            transition: "all 0.3s",
                         }}
                     >
                         {collapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
                     </IconButton>
-                </>
+                </Box>
             )}
 
             <Box
@@ -1197,47 +1260,48 @@ export default function ChatScreenMui() {
                         "&::-webkit-scrollbar": { display: "none" },
                         position: 'relative'
                     }}>
-                        <Box
-                            sx={{
-                                position: 'sticky',
-                                top: 0,
-                                bgcolor: SIDEBAR_BG,
-                                zIndex: 10,
-                                py: 1,
-                                width: '100%',
-                                pl: (isDesktop && collapsed) ? 0 : 3,
-                                mb: 1,
-                                textAlign: (isDesktop && collapsed) ? 'center' : 'left'
-                            }}
-                        >
-                            <Typography sx={{
-                                fontSize: 11,
-                                color: 'rgba(255,255,255,0.5)',
-                                textTransform: 'uppercase',
-                                letterSpacing: 1,
-                            }}>
-                                History
-                            </Typography>
-                        </Box>
+                        {!(isDesktop && collapsed) && (
+                            <Box
+                                sx={{
+                                    position: 'sticky',
+                                    top: 0,
+                                    bgcolor: SIDEBAR_BG,
+                                    zIndex: 10,
+                                    py: 1,
+                                    width: '100%',
+                                    pl: 3,
+                                    mb: 1,
+                                }}
+                            >
+                                <Typography sx={{
+                                    fontSize: 11,
+                                    color: 'rgba(255,255,255,0.5)',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 1,
+                                }}>
+                                    History
+                                </Typography>
+                            </Box>
+                        )}
 
                         {conversations.map((c) => (
-                            <Tooltip key={c._id} title={(isDesktop && collapsed) ? (c.title || "Conversation") : ""} placement="right">
+                            <Tooltip key={c.id} title={(isDesktop && collapsed) ? (c.title || "Conversation") : ""} placement="right">
                                 <Box
                                     onClick={() => {
                                         openConversation(c);
                                         if (!isDesktop) setMobileOpen(false);
                                     }}
                                     sx={{
-                                        width: (isDesktop && collapsed) ? '85%' : '90%',
+                                        width: (isDesktop && collapsed) ? 44 : '90%',
                                         mx: 'auto',
                                         mb: 1,
-                                        p: 1,
+                                        p: (isDesktop && collapsed) ? 0 : 1,
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'space-between',
+                                        justifyContent: (isDesktop && collapsed) ? 'center' : 'space-between',
                                         borderRadius: 1.5,
                                         cursor: "pointer",
-                                        background: activeConversationId === c._id ? "rgba(255,255,255,0.12)" : "transparent",
+                                        background: activeConversationId === c.id ? "rgba(255,255,255,0.12)" : "transparent",
                                         "&:hover": {
                                             background: "rgba(255,255,255,0.08)",
                                             "& .delete-btn": { opacity: 1 }
@@ -1245,33 +1309,48 @@ export default function ChatScreenMui() {
                                         position: 'relative'
                                     }}
                                 >
-                                    <Typography
-                                        sx={{
-                                            fontSize: 12,
-                                            color: "rgba(255,255,255,0.9)",
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            maxWidth: '80%'
-                                        }}
-                                    >
-                                        {c.title || "Conversation"}
-                                    </Typography>
+                                    {isDesktop && collapsed ? (
+                                        <IconButton
+                                            size="small"
+                                            sx={{
+                                                color: "rgba(255,255,255,0.9)",
+                                                width: 40,
+                                                height: 40,
+                                            }}
+                                        >
+                                            <ChatBubbleOutlineIcon sx={{ fontSize: 20 }} />
+                                        </IconButton>
+                                    ) : (
+                                        <>
+                                            <Typography
+                                                sx={{
+                                                    fontSize: 12,
+                                                    color: "rgba(255,255,255,0.9)",
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    maxWidth: '80%'
+                                                }}
+                                            >
+                                                {c.title || "Conversation"}
+                                            </Typography>
 
-                                    <IconButton
-                                        className="delete-btn"
-                                        size="small"
-                                        onClick={(e) => deleteConversation(e, c._id)}
-                                        sx={{
-                                            color: "rgba(255,255,255,0.4)",
-                                            opacity: 0,
-                                            transition: 'opacity 0.2s',
-                                            padding: 0.5,
-                                            "&:hover": { color: "#ff6b6b" }
-                                        }}
-                                    >
-                                        <DeleteIcon fontSize="small" sx={{ fontSize: 16 }} />
-                                    </IconButton>
+                                            <IconButton
+                                                className="delete-btn"
+                                                size="small"
+                                                onClick={(e) => deleteConversation(e, c.id)}
+                                                sx={{
+                                                    color: "rgba(255,255,255,0.4)",
+                                                    opacity: 0,
+                                                    transition: 'opacity 0.2s',
+                                                    padding: 0.5,
+                                                    "&:hover": { color: "#ff6b6b" }
+                                                }}
+                                            >
+                                                <DeleteIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        </>
+                                    )}
                                 </Box>
                             </Tooltip>
                         ))}
@@ -1373,6 +1452,8 @@ export default function ChatScreenMui() {
                     <Box
                         sx={{
                             width: sidebarWidth,
+                            minWidth: sidebarWidth,
+                            maxWidth: sidebarWidth,
                             bgcolor: SIDEBAR_BG,
                             color: "#664B2E",
                             display: "flex",
@@ -1386,8 +1467,9 @@ export default function ChatScreenMui() {
                             left: 0,
                             height: "100vh",
                             zIndex: 1300,
+                            overflowX: "hidden",
                             overflowY: "auto",
-                            transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1)",
+                            transition: "width 300ms cubic-bezier(0.4, 0, 0.2, 1), min-width 300ms cubic-bezier(0.4, 0, 0.2, 1), max-width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1)",
                             scrollbarWidth: 'none',
                             "&::-webkit-scrollbar": { display: "none" }
                         }}
@@ -1512,22 +1594,6 @@ export default function ChatScreenMui() {
                     </Box>
                 )}
 
-                {/* Login Overlay / Disabler */}
-                {inputDisabled && !user && (
-                    <Box sx={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 9999,
-                        pointerEvents: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}>
-                    </Box>
-                )}
 
 
 
@@ -1851,7 +1917,7 @@ export default function ChatScreenMui() {
                                                 value={input}
                                                 onChange={(e) => setInput(e.target.value)}
                                                 onKeyDown={onKeyDown}
-                                                placeholder={isListening ? "" : "Start typing here..."}
+                                                placeholder={isListening && !voiceModeActive ? "" : "Start typing here..."}
                                                 multiline={false}
                                                 fullWidth
                                                 variant="filled"
@@ -1861,7 +1927,11 @@ export default function ChatScreenMui() {
                                                         height: 54,
                                                         borderRadius: "28px",
                                                         border: "1px solid #CAA361",
-                                                        pr: isListening ? "110px" : "64px",
+                                                        pr: voiceModeActive
+                                                            ? "132px"
+                                                            : isListening && !voiceModeActive
+                                                                ? "110px"
+                                                                : "64px",
                                                         pl: 3,
                                                         bgcolor: INPUT_BG,
                                                         display: "flex",
@@ -1886,12 +1956,18 @@ export default function ChatScreenMui() {
                                                         },
                                                     },
                                                 }}
-                                                disabled={sending || isListening || inputDisabled}
+                                                disabled={sending || (isListening && !voiceModeActive) || voiceModeActive || inputDisabled}
                                             />
 
 
 
-                                            {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
+                                            {isListening && !voiceModeActive && (
+                                                <VoiceWaveformOverlay
+                                                    onConfirm={handleConfirmVoice}
+                                                    onCancel={handleCancelVoice}
+                                                    borderRadius="28px"
+                                                />
+                                            )}
 
 
 
@@ -1901,6 +1977,7 @@ export default function ChatScreenMui() {
                                                 type="button"
                                                 aria-label="voice input"
                                                 onClick={handleMicClick}
+                                                disabled={inputDisabled || sending || voiceModeActive}
                                                 sx={{
                                                     position: "absolute",
                                                     right: 58,
@@ -1943,13 +2020,13 @@ export default function ChatScreenMui() {
                                                     right: 14,
                                                     top: "50%",
                                                     transform: "translateY(-50%)",
-                                                    zIndex: 20,
-                                                    transition: "all 0.3s ease"
+                                                    zIndex: 30,
                                                 }}
                                             >
                                                 <Button
                                                     onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
                                                     variant="contained"
+                                                    disableElevation
                                                     sx={{
                                                         bgcolor: "#5b3f2a",
                                                         color: "white",
@@ -1959,30 +2036,26 @@ export default function ChatScreenMui() {
                                                         borderRadius: voiceModeActive ? "18px" : "50%",
                                                         p: 0,
                                                         px: voiceModeActive ? 2 : 0,
-                                                        "&:hover": { bgcolor: "#4a3322" },
                                                         boxShadow: "none",
+                                                        transition: "width 0.25s ease, min-width 0.25s ease, border-radius 0.25s ease",
+                                                        "&:hover": { bgcolor: "#4a3322", boxShadow: "none" },
                                                         display: (isListening && !voiceModeActive) ? "none" : "flex",
-                                                        gap: 1
+                                                        gap: 1,
                                                     }}
                                                 >
                                                     {voiceModeActive ? (
                                                         <>
-                                                            <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                            <AnimatedVoiceIcon
+                                                                active={isSpeaking}
+                                                                idleMode="dots"
+                                                                size={20}
+                                                            />
                                                             <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
                                                         </>
                                                     ) : (
-                                                        <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                                        <AnimatedVoiceIcon active={false} size={20} />
                                                     )}
                                                 </Button>
-                                                {voiceModeActive && (
-                                                    <style>{`
-                                                @keyframes float {
-                                                    0% { transform: translateY(0px); }
-                                                    50% { transform: translateY(-3px); }
-                                                    100% { transform: translateY(0px); }
-                                                }
-                                            `}</style>
-                                                )}
                                             </Box>
                                         </Box>
 
@@ -1990,7 +2063,7 @@ export default function ChatScreenMui() {
                                             component="button"
                                             type="submit"
                                             aria-label="send message"
-                                            disabled={sending || !input.trim()}
+                                            disabled={sending || !input.trim() || inputDisabled}
                                             sx={{
                                                 width: 48,
                                                 height: 48,
@@ -2001,7 +2074,7 @@ export default function ChatScreenMui() {
                                                 border: "1px solid #CAA361",
                                                 backgroundColor: INPUT_BG,
                                                 cursor:
-                                                    input.trim() && !sending
+                                                    input.trim() && !sending && !inputDisabled
                                                         ? "pointer"
                                                         : "default",
                                                 transition: "0.15s",
@@ -2030,7 +2103,6 @@ export default function ChatScreenMui() {
                                         </Box>
                                     </Box>
                                 </Box>
-                            </Box>
                             {!isMobile && (
                                 <>
                                     <Typography
@@ -2214,14 +2286,7 @@ export default function ChatScreenMui() {
                                                                 "pre-wrap",
                                                         }}
                                                     >
-                                                        <Typography
-                                                            variant="body1"
-                                                            sx={{
-                                                                color: ACCENT_DARK,
-                                                            }}
-                                                        >
-                                                            {m.text}
-                                                        </Typography>
+                                                        {renderChatText(m.text, ACCENT_DARK)}
                                                     </Paper>
                                                 </>
                                             ) : (
@@ -2240,14 +2305,7 @@ export default function ChatScreenMui() {
                                                                 "pre-wrap",
                                                         }}
                                                     >
-                                                        <Typography
-                                                            variant="body1"
-                                                            sx={{
-                                                                color: ACCENT_DARK,
-                                                            }}
-                                                        >
-                                                            {m.text}
-                                                        </Typography>
+                                                        {renderChatText(m.text, ACCENT_DARK)}
                                                     </Paper>
                                                 </>
                                             )}
@@ -2332,7 +2390,7 @@ export default function ChatScreenMui() {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={onKeyDown}
-                                    placeholder="Send a message..."
+                                    placeholder={isListening && !voiceModeActive ? "" : "Send a message..."}
                                     multiline
                                     minRows={1}
                                     maxRows={6}
@@ -2342,7 +2400,11 @@ export default function ChatScreenMui() {
                                         disableUnderline: true,
                                         sx: {
                                             borderRadius: "18px",
-                                            pr: "64px",
+                                            pr: voiceModeActive
+                                                ? "132px"
+                                                : isListening && !voiceModeActive
+                                                    ? "110px"
+                                                    : "64px",
                                             pl: 3,
                                             bgcolor: INPUT_BG,
                                             paddingY: "14px",
@@ -2353,13 +2415,14 @@ export default function ChatScreenMui() {
                                             },
                                         },
                                     }}
-                                    disabled={sending}
+                                    disabled={sending || (isListening && !voiceModeActive) || voiceModeActive || inputDisabled}
                                 />
 
                                 <IconButton
                                     type="button"
                                     aria-label="voice input"
                                     onClick={handleMicClick}
+                                    disabled={inputDisabled || sending || voiceModeActive}
                                     sx={{
                                         position: "absolute",
                                         right: 58,
@@ -2401,13 +2464,14 @@ export default function ChatScreenMui() {
                                         right: 14,
                                         top: "50%",
                                         transform: "translateY(-50%)",
-                                        zIndex: 20,
-                                        transition: "all 0.3s ease"
+                                        zIndex: 30,
                                     }}
                                 >
                                     <Button
                                         onClick={voiceModeActive ? stopVoiceMode : () => setVoiceModalOpen(true)}
                                         variant="contained"
+                                        disableElevation
+                                        disabled={inputDisabled}
                                         sx={{
                                             bgcolor: "#5b3f2a",
                                             color: "white",
@@ -2417,40 +2481,42 @@ export default function ChatScreenMui() {
                                             borderRadius: voiceModeActive ? "18px" : "50%",
                                             p: 0,
                                             px: voiceModeActive ? 2 : 0,
-                                            "&:hover": { bgcolor: "#4a3322" },
                                             boxShadow: "none",
+                                            transition: "width 0.25s ease, min-width 0.25s ease, border-radius 0.25s ease",
+                                            "&:hover": { bgcolor: "#4a3322", boxShadow: "none" },
                                             display: (isListening && !voiceModeActive) ? "none" : "flex",
-                                            gap: 1
+                                            gap: 1,
                                         }}
                                     >
                                         {voiceModeActive ? (
                                             <>
-                                                <GraphicEqIcon sx={{ animation: "float 2s ease-in-out infinite" }} />
+                                                <AnimatedVoiceIcon
+                                                    active={isSpeaking}
+                                                    idleMode="dots"
+                                                    size={20}
+                                                />
                                                 <Typography variant="button" sx={{ textTransform: "none" }}>End</Typography>
                                             </>
                                         ) : (
-                                            <GraphicEqIcon sx={{ fontSize: 20 }} />
+                                            <AnimatedVoiceIcon active={false} size={20} />
                                         )}
                                     </Button>
-                                    {voiceModeActive && (
-                                        <style>{`
-                                                            @keyframes float {
-                                                                0% { transform: translateY(0px); }
-                                                                50% { transform: translateY(-3px); }
-                                                                100% { transform: translateY(0px); }
-                                                            }
-                                                        `}</style>
-                                    )}
                                 </Box>
 
-                                {isListening && <VoiceWaveformOverlay onConfirm={handleConfirmVoice} onCancel={handleCancelVoice} isSpeaking={isSpeaking} />}
+                                {isListening && !voiceModeActive && (
+                                    <VoiceWaveformOverlay
+                                        onConfirm={handleConfirmVoice}
+                                        onCancel={handleCancelVoice}
+                                        borderRadius="18px"
+                                    />
+                                )}
                             </Box>
 
                             <Box
                                 component="button"
                                 type="submit"
                                 aria-label="send message"
-                                disabled={sending || !input.trim()}
+                                disabled={sending || !input.trim() || inputDisabled}
                                 sx={{
                                     width: 48,
                                     height: 48,
