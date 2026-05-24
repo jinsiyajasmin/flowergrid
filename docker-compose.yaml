@@ -1,3 +1,6 @@
+# Local development only (includes Postgres).
+# For Coolify / external database, use docker-compose.coolify.yaml instead.
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -38,7 +41,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
       - "5173:5173"

@@ -46,8 +46,15 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const allowedOrigins = [
   'https://flowergrid.vercel.app',
   'http://localhost:5173',
-  'http://localhost:4000'
+  'http://localhost:4000',
 ];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 app.use(cors({
   origin: function (origin, callback) {
