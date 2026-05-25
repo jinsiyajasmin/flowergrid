@@ -7,8 +7,7 @@ RUN npm ci
 
 COPY . .
 
-# Empty = same-origin /chat, /auth, … (nginx proxies to Express)
-ARG VITE_API_BASE=
+ARG VITE_API_BASE=/api
 ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build

@@ -28,7 +28,7 @@ import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
 import ScaleLetterText from "./components/ScaleLetterText";
-import { API_BASE } from "./config";
+import { apiPath } from "./config";
 import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
@@ -111,14 +111,14 @@ function apiHeaders(userId) {
 }
 
 async function fetchAuthUser() {
-    const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
+    const res = await fetch(apiPath("/auth/me"), { credentials: "include" });
     if (!res.ok) return null;
     const data = await res.json();
     return data.user ?? null;
 }
 
 async function fetchSessionStatus(userId) {
-    const res = await fetch(`${API_BASE}/chat/session/status`, {
+    const res = await fetch(apiPath("/chat/session/status"), {
         credentials: "include",
         headers: userId ? { "x-user-id": userId } : {},
     });
@@ -127,7 +127,7 @@ async function fetchSessionStatus(userId) {
 }
 
 async function createServerChatSession(userId, previousSessionId) {
-    const res = await fetch(`${API_BASE}/chat/session/new`, {
+    const res = await fetch(apiPath("/chat/session/new"), {
         method: "POST",
         credentials: "include",
         headers: apiHeaders(userId),
@@ -140,7 +140,7 @@ async function createServerChatSession(userId, previousSessionId) {
 }
 
 async function activateServerChatSession(userId, sessionId) {
-    const res = await fetch(`${API_BASE}/chat/session/activate`, {
+    const res = await fetch(apiPath("/chat/session/activate"), {
         method: "POST",
         credentials: "include",
         headers: apiHeaders(userId),
@@ -179,7 +179,7 @@ async function resumeServerSession(sessionId, messages, userId) {
     try {
         const headers = { "Content-Type": "application/json" };
         if (userId) headers["x-user-id"] = userId;
-        await fetch(`${API_BASE}/chat/session/resume`, {
+        await fetch(apiPath("/chat/session/resume"), {
             method: "POST",
             headers,
             credentials: "include",
@@ -317,7 +317,7 @@ export default function ChatScreenMui() {
     useEffect(() => {
         if (!user) return;
 
-        fetch(`${API_BASE}/conversations`, {
+        fetch(apiPath("/conversations"), {
             credentials: "include",
             headers: {
                 'x-user-id': user.id
@@ -614,7 +614,7 @@ export default function ChatScreenMui() {
 
             const headers = apiHeaders(user?.id);
 
-            const resp = await fetch(`${API_BASE}/chat`, {
+            const resp = await fetch(apiPath("/chat"), {
                 method: "POST",
                 headers,
                 credentials: "include",
@@ -726,7 +726,7 @@ export default function ChatScreenMui() {
         if (user && currentMessages.length > 0 && currentSessionId) {
             try {
                 await sendChatSummary(currentMessages, currentSessionId);
-                const listRes = await fetch(`${API_BASE}/conversations`, {
+                const listRes = await fetch(apiPath("/conversations"), {
                     credentials: "include",
                     headers: { "x-user-id": user.id },
                 });
@@ -783,7 +783,7 @@ export default function ChatScreenMui() {
             sendChatSummary(currentMessages, currentSessionId)
                 .then(() => {
                     // Refresh history list so newly saved title appears
-                    fetch(`${API_BASE}/conversations`, {
+                    fetch(apiPath("/conversations"), {
                         credentials: "include",
                         headers: { 'x-user-id': user.id }
                     })
@@ -802,7 +802,7 @@ export default function ChatScreenMui() {
         setActiveConversationId(conversation.id);
         setConversationMode(true);
 
-        fetch(`${API_BASE}/conversations/${conversation.id}`, {
+        fetch(apiPath(`/conversations/${conversation.id}`), {
             credentials: "include",
             headers: { 'x-user-id': user.id }
         })
@@ -846,7 +846,7 @@ export default function ChatScreenMui() {
     async function handleConfirmDelete() {
         if (!idToDelete) return;
         try {
-            const res = await fetch(`${API_BASE}/conversations/${idToDelete}`, {
+            const res = await fetch(apiPath(`/conversations/${idToDelete}`), {
                 method: "DELETE",
                 credentials: "include",
                 headers: { 'x-user-id': user.id }
@@ -915,7 +915,7 @@ export default function ChatScreenMui() {
 
             if (!user || !msgsToSave.length || !sidToSave) return;
 
-            await fetch(`${API_BASE}/chat/summary`, {
+            await fetch(apiPath("/chat/summary"), {
                 method: "POST",
                 credentials: "include",
                 keepalive: true,
@@ -979,7 +979,7 @@ export default function ChatScreenMui() {
         }
 
         try {
-            await fetch(`${API_BASE}/auth/logout`, {
+            await fetch(apiPath("/auth/logout"), {
                 method: "POST",
                 credentials: "include",
             });
@@ -1799,7 +1799,7 @@ export default function ChatScreenMui() {
                                 <Box
                                     onClick={() => {
                                         handleSignupClose();
-                                        window.location.href = `${API_BASE}/auth/google`;
+                                        window.location.href = apiPath("/auth/google");
                                     }}
                                     sx={{
                                         width: "100%",

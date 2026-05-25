@@ -1,5 +1,14 @@
 # Coolify deploy checklist (fix chat + signup)
 
+## If the browser calls `localhost:4000` on the live site
+
+Coolify is running **Vite dev** (`npm run dev`) or `VITE_API_BASE` is set to a localhost URL. Fix:
+
+1. Use **root `Dockerfile`** (production nginx + API), not `frontend/Dockerfile.dev`
+2. **Remove** `VITE_API_BASE=http://localhost:4000` from Coolify env
+3. Set `VITE_API_BASE=/api` or leave it empty
+4. **Rebuild** (not restart only)
+
 ## Problem if chat/signup broken
 
 Open: `https://luna.flowergrid.co.uk/api/health`

@@ -33,7 +33,7 @@ import flowerGridLogo from "../assets/flower.png";
 import flower from "../assets/flowergrid_logo_text.png";
 import PeopleIcon from "../assets/none.png";
 import AnimatedDashboardIcon from "./components/AnimatedDashboardIcon";
-import { API_BASE } from "./config";
+import { apiPath } from "./config";
 
 export default function AdminDashboard() {
   const [summaries, setSummaries] = useState([]);
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
 
   const fetchSummaries = async () => {
     try {
-      const res = await fetch(`${API_BASE}/admin/summaries`, {
+      const res = await fetch(apiPath("/admin/summaries"), {
         credentials: "include",
         cache: "no-store",
       });
