@@ -49,7 +49,7 @@ export function getFrontendUrl() {
 export const FRONTEND_URL = LIVE_SITE_URL;
 
 const DEPLOY_HINT =
-  "The API is not running. In Coolify use repository root as Base Directory and Dockerfile = Dockerfile, then rebuild.";
+  "The API is not running. In Coolify use Base Directory = / and docker-compose.yaml (or Dockerfile), then rebuild.";
 
 /** True when the live site is serving Vite dev or frontend-only (no Express API). */
 export function isWrongProductionDeploy(response) {
@@ -72,7 +72,7 @@ export async function startGoogleSignIn() {
     res = await fetch(apiPath("/health"), { credentials: "include" });
   } catch {
     throw new Error(
-      "Cannot reach the API. In Coolify use Base Directory = repo root and docker-compose.yml or Dockerfile, then rebuild."
+      "Cannot reach the API. In Coolify use Base Directory = repo root and docker-compose.yaml or Dockerfile, then rebuild."
     );
   }
 

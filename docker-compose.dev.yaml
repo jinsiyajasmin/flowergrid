@@ -1,5 +1,5 @@
 # Local development only (Postgres + API + Vite dev).
-# Do NOT point Coolify at this file — use docker-compose.yml (production).
+# Do NOT point Coolify at this file — use docker-compose.yaml (production).
 
 services:
   postgres:

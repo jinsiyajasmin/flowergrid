@@ -40,14 +40,14 @@ API base locally: `http://localhost:4000/api`
 
 ## Deploy on Coolify (recommended: one container)
 
-Use **`docker-compose.yml`** (production) or build root **`Dockerfile`** — **nginx + Express in one container**:
+Use **`docker-compose.yaml`** (production) or build root **`Dockerfile`** — **nginx + Express in one container**:
 
 - Public site: `https://luna.flowergrid.co.uk` (port **80**)
 - All API routes: `https://luna.flowergrid.co.uk/api/...` (e.g. `/api/chat`, `/api/auth/google`)
 
 ### Coolify setup
 
-1. Build pack: **Docker Compose** — file `docker-compose.yml` (or Dockerfile at repo root). Base Directory: **`/`** (not `/frontend`)
+1. Build pack: **Docker Compose** — file `docker-compose.yaml` (or Dockerfile at repo root). Base Directory: **`/`** (not `/frontend`)
 2. Do **not** use `docker-compose.dev.yaml` (Vite dev — breaks `/api/auth/google`)
 3. Domain: **`luna.flowergrid.co.uk`** → port **80**
 4. Environment variables:

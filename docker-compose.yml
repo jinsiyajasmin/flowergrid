@@ -1,6 +1,5 @@
-# Production (Coolify): one container — nginx + Express API on /api
-# Coolify: Build pack = Docker Compose, Base Directory = /, this file = docker-compose.yml
-# Public URL → port 80
+# Production (same as docker-compose.yaml). Coolify often expects .yaml — use that file in Coolify UI.
+# Local: docker compose -f docker-compose.yaml up --build
 
 services:
   app:

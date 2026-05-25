@@ -41,7 +41,7 @@ Open: `https://luna.flowergrid.co.uk/api/health`
 ## Correct Coolify settings
 
 1. **Repository root** as base directory (`/`), **not** `/frontend`
-2. **Docker Compose file:** `docker-compose.yml` **or** Dockerfile: `Dockerfile` (repo root)
+2. **Docker Compose file:** `docker-compose.yaml` **or** Dockerfile: `Dockerfile` (repo root)
 3. **Do not** use `docker-compose.dev.yaml`, `frontend/Dockerfile.dev`, or `npm run dev`
 4. **One domain:** `luna.flowergrid.co.uk` → port **80**
 5. **Environment variables:**

@@ -1,5 +1,6 @@
-# Alias of docker-compose.yaml (same production stack).
-# Coolify default path is often /docker-compose.yaml
+# Production (Coolify): one container — nginx + Express API on /api
+# Coolify: Docker Compose Location = docker-compose.yaml, Base Directory = /
+# Public URL → port 80
 
 services:
   app:
