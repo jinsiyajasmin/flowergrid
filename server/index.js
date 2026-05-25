@@ -43,11 +43,10 @@ const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
 const KB_EMBED_CHUNK_OVERLAP = 200;
 
-const LIVE_FRONTEND_URL = 'https://luna.flowergrid.co.uk';
-const LIVE_API_URL = 'https://api.flowergrid.co.uk';
+const LIVE_SITE_URL = 'https://luna.flowergrid.co.uk';
 
 const allowedOrigins = [
-  LIVE_FRONTEND_URL,
+  LIVE_SITE_URL,
   'https://flowergrid.vercel.app',
   'http://localhost:5173',
   'http://localhost:4000',
@@ -63,11 +62,16 @@ if (process.env.NODE_ENV === 'production') {
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    const normalized = origin.replace(/\/$/, '');
+    if (allowedOrigins.some((o) => o.replace(/\/$/, '') === normalized)) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    // Same-host deploy (nginx proxy) or flowergrid production domains
+    if (/^https:\/\/([a-z0-9-]+\.)*flowergrid\.co\.uk$/i.test(normalized)) {
+      return callback(null, true);
+    }
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -140,7 +144,7 @@ passport.use(
       callbackURL:
         process.env.GOOGLE_CALLBACK_URL ||
         (process.env.NODE_ENV === 'production'
-          ? `${LIVE_API_URL}/auth/google/callback`
+          ? `${LIVE_SITE_URL}/auth/google/callback`
           : 'http://localhost:4000/auth/google/callback'),
     },
     async (accessToken, refreshToken, profile, done) => {
@@ -197,7 +201,7 @@ app.get(
     const frontendUrl =
       process.env.FRONTEND_URL ||
       (process.env.NODE_ENV === 'production'
-        ? LIVE_FRONTEND_URL
+        ? LIVE_SITE_URL
         : 'http://localhost:5173');
     res.redirect(frontendUrl.replace(/\/$/, ''));
   }
@@ -1204,8 +1208,8 @@ app.post('/chat/session/reset', async (req, res) => {
 });
 
 if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
-  app.listen(PORT, () => {
-    console.log(`🌼 Luna is live at http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌼 Luna is live on port ${PORT}`);
   });
 }
 

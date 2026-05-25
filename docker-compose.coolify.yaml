@@ -13,6 +13,8 @@ services:
     restart: unless-stopped
     expose:
       - "4000"
+    networks:
+      - flowergrid
     environment:
       NODE_ENV: production
       PORT: ${PORT:-4000}
@@ -24,7 +26,7 @@ services:
       EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://api.flowergrid.co.uk/auth/google/callback}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/auth/google/callback}
       FRONTEND_URL: ${FRONTEND_URL:-https://luna.flowergrid.co.uk}
     healthcheck:
       test:
@@ -44,10 +46,17 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE: ${VITE_API_BASE:-https://api.flowergrid.co.uk}
+        # Leave empty for single-domain deploy (relative API paths)
+        VITE_API_BASE: ${VITE_API_BASE:-}
     restart: unless-stopped
     expose:
       - "80"
     depends_on:
       server:
         condition: service_healthy
+    networks:
+      - flowergrid
+
+networks:
+  flowergrid:
+    driver: bridge

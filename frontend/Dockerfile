@@ -7,7 +7,8 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_API_BASE=https://api.flowergrid.co.uk
+# Empty = same-origin /chat, /auth, … (nginx proxies to Express)
+ARG VITE_API_BASE=
 ENV VITE_API_BASE=$VITE_API_BASE
 
 RUN npm run build

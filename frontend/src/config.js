@@ -1,40 +1,39 @@
-const LIVE_FRONTEND_URL = "https://luna.flowergrid.co.uk";
-const LIVE_API_URL = "https://api.flowergrid.co.uk";
+const LIVE_SITE_URL = "https://luna.flowergrid.co.uk";
 
 const isLocalhost =
   typeof window !== "undefined" &&
   (window.location.hostname === "localhost" ||
     window.location.hostname === "127.0.0.1");
 
-const isFlowergridLive =
+const isLunaLive =
   typeof window !== "undefined" &&
-  (window.location.hostname === "luna.flowergrid.co.uk" ||
-    window.location.hostname.endsWith(".flowergrid.co.uk"));
+  window.location.hostname === "luna.flowergrid.co.uk";
 
-function isLocalApiUrl(url) {
-  return Boolean(url && /localhost|127\.0\.0\.1/i.test(url));
-}
-
+/**
+ * API base for fetch()/navigation.
+ * - Local dev: http://localhost:4000 (separate Vite + Express)
+ * - Production (single host): "" so requests go to /chat, /auth/… on the same
+ *   domain and nginx proxies them to Express
+ */
 function resolveApiBase() {
-  const envBase = import.meta.env.VITE_API_BASE?.replace(/\/$/, "");
-
   if (isLocalhost) {
+    const envBase = import.meta.env.VITE_API_BASE?.replace(/\/$/, "");
     return envBase || "http://localhost:4000";
   }
-
-  // Non-localhost: only trust env when it is not a dev URL (stale Docker builds)
-  if (envBase && !isLocalApiUrl(envBase)) {
-    return envBase;
-  }
-
-  return LIVE_API_URL;
+  return "";
 }
 
 export const API_BASE = resolveApiBase();
 
+/** Build an API path (handles empty API_BASE for same-origin deploys). */
+export function apiPath(path) {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return API_BASE ? `${API_BASE}${p}` : p;
+}
+
 export const FRONTEND_URL =
-  typeof window !== "undefined" && isFlowergridLive
+  typeof window !== "undefined" && isLunaLive
     ? window.location.origin
     : isLocalhost
       ? "http://localhost:5173"
-      : LIVE_FRONTEND_URL;
+      : LIVE_SITE_URL;
