@@ -1,4 +1,9 @@
-# Coolify production — Base Directory: / , Compose file: docker-compose.yaml , Port: 80
+# Coolify production
+# Base Directory: /  |  Compose file: docker-compose.yaml  |  Public port: 80
+#
+# Set these in Coolify → your app → Environment Variables (same names as below).
+# Coolify injects them into ${VAR_NAME} when the stack starts.
+
 services:
   app:
     build:
@@ -18,15 +23,26 @@ services:
       retries: 5
       start_period: 120s
     environment:
+      # --- Runtime (fixed for production image) ---
       NODE_ENV: production
-      PORT: 4000
-      DATABASE_URL: ${DATABASE_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      CHAT_MODEL: ${CHAT_MODEL:-gpt-4o}
-      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/api/auth/google/callback}
-      FRONTEND_URL: ${FRONTEND_URL:-https://luna.flowergrid.co.uk}
+      PORT: "4000"
+
+      # --- Database (required) — use your Neon / Coolify Postgres URL ---
+      DATABASE_URL: "${DATABASE_URL}"
+
+      # --- Session (required) — long random string ---
+      SESSION_SECRET: "${SESSION_SECRET}"
+
+      # --- OpenAI (required for chat) ---
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+      CHAT_MODEL: "${CHAT_MODEL:-gpt-4o}"
+      EMBED_MODEL: "${EMBED_MODEL:-text-embedding-3-small}"
+
+      # --- Google OAuth (required for sign-up) ---
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_CALLBACK_URL: "${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/api/auth/google/callback}"
+      FRONTEND_URL: "${FRONTEND_URL:-https://luna.flowergrid.co.uk}"
+
+      # Do NOT set VITE_API_BASE in Coolify (causes localhost API URLs in the browser).

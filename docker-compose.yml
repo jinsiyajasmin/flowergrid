@@ -1,4 +1,4 @@
-# Same as docker-compose.yaml (Coolify may use either extension).
+# Same as docker-compose.yaml — Coolify may use either file name.
 services:
   app:
     build:
@@ -19,14 +19,14 @@ services:
       start_period: 120s
     environment:
       NODE_ENV: production
-      PORT: 4000
-      DATABASE_URL: ${DATABASE_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
-      CHAT_MODEL: ${CHAT_MODEL:-gpt-4o}
-      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/api/auth/google/callback}
-      FRONTEND_URL: ${FRONTEND_URL:-https://luna.flowergrid.co.uk}
+      PORT: "4000"
+      DATABASE_URL: "${DATABASE_URL}"
+      SESSION_SECRET: "${SESSION_SECRET}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      OPENAI_BASE_URL: "${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+      CHAT_MODEL: "${CHAT_MODEL:-gpt-4o}"
+      EMBED_MODEL: "${EMBED_MODEL:-text-embedding-3-small}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_CALLBACK_URL: "${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/api/auth/google/callback}"
+      FRONTEND_URL: "${FRONTEND_URL:-https://luna.flowergrid.co.uk}"

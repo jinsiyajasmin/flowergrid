@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Luna — Google OAuth setup</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.55; color: #111; }
+    code, pre { background: #f3f4f6; padding: 2px 8px; border-radius: 6px; word-break: break-all; font-size: 14px; }
+    pre { padding: 12px; overflow-x: auto; }
+    .ok { color: #047857; } .bad { color: #b91c1c; }
+    button { margin: 4px 8px 4px 0; padding: 8px 14px; cursor: pointer; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; }
+    button.primary { background: #111827; color: #fff; border-color: #111827; }
+    h2 { margin-top: 1.5rem; }
+    ol li { margin: 0.4rem 0; }
+    .box { border: 1px solid #e5e7eb; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Fix Google <code>redirect_uri_mismatch</code></h1>
+  <p>This page reads your <strong>live</strong> Luna server config and shows exactly what to paste into Google Cloud Console.</p>
+
+  <div class="box" id="status">Loading server config…</div>
+
+  <h2>Step 1 — Click “Error details” on Google’s page</h2>
+  <p>On the Google error screen, click <strong>If you are a developer of this app, see error details.</strong></p>
+  <p>It shows the <code>redirect_uri=</code> Google actually received. That string must appear <strong>character-for-character</strong> in Google Console (see Step 2).</p>
+
+  <h2>Step 2 — Edit the <em>same</em> OAuth client</h2>
+  <ol>
+    <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console → Credentials</a></li>
+    <li>Find OAuth 2.0 Client ID that <strong>exactly matches</strong> <code id="clientIdHint">(loading…)</code> above — not a different app name</li>
+    <li>Application type must be <strong>Web application</strong> (not Desktop / Android / iOS)</li>
+    <li><strong>Authorized redirect URIs</strong> — add only: <code id="redirectHint">(loading…)</code></li>
+    <li><strong>Authorized JavaScript origins</strong> — add: <code>https://luna.flowergrid.co.uk</code></li>
+    <li>Remove wrong URIs (missing <code>/api</code>): <code>…/auth/google/callback</code></li>
+    <li>Click <strong>Save</strong>, wait 10 minutes</li>
+  </ol>
+
+  <h2>Step 3 — Still failing? Create a <em>new</em> Web OAuth client</h2>
+  <ol>
+    <li>Credentials → <strong>Create credentials</strong> → <strong>OAuth client ID</strong></li>
+    <li>Application type: <strong>Web application</strong></li>
+    <li>Redirect URI: <code>https://luna.flowergrid.co.uk/api/auth/google/callback</code></li>
+    <li>Origin: <code>https://luna.flowergrid.co.uk</code></li>
+    <li>Copy the <strong>new</strong> Client ID + Secret into Coolify (replace old values)</li>
+    <li>Coolify → <strong>Redeploy</strong> (restart container)</li>
+  </ol>
+
+  <h2>Step 4 — Coolify must match</h2>
+  <pre>GOOGLE_CLIENT_ID=&lt;same as Step 2 or new client&gt;
+GOOGLE_CLIENT_SECRET=&lt;secret for that client only&gt;
+GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback
+FRONTEND_URL=https://luna.flowergrid.co.uk</pre>
+
+  <p>
+    <button class="primary" type="button" id="testSignIn">Test sign-in</button>
+    <button type="button" id="reload">Reload config</button>
+  </p>
+
+  <script>
+    const PRODUCTION_CALLBACK = "https://luna.flowergrid.co.uk/api/auth/google/callback";
+
+    async function load() {
+      const el = document.getElementById("status");
+      try {
+        const res = await fetch("/api/auth/google/status", { credentials: "include" });
+        const data = await res.json();
+        const clientId = data.clientId || "(not returned — redeploy latest server)";
+        const callbackUrl = data.callbackUrl || PRODUCTION_CALLBACK;
+        const match = callbackUrl === PRODUCTION_CALLBACK;
+
+        document.getElementById("clientIdHint").textContent = clientId;
+        document.getElementById("redirectHint").textContent = callbackUrl;
+
+        el.innerHTML = `
+          <p><strong>Live Client ID</strong> (must match Google Console):</p>
+          <pre>${clientId}</pre>
+          <p><strong>Live redirect URI</strong> sent to Google:</p>
+          <pre>${callbackUrl}</pre>
+          <p class="${match ? "ok" : "bad"}">${match ? "✓ Callback path is correct (/api/auth/google/callback)" : "✗ Callback URL mismatch — fix Coolify GOOGLE_CALLBACK_URL"}</p>
+          <p><strong>Start sign-in URL:</strong> <code>${data.startUrl || "https://luna.flowergrid.co.uk/api/auth/google"}</code></p>
+        `;
+      } catch (e) {
+        el.innerHTML = `<p class="bad">Could not load /api/auth/google/status — API may be down.</p>`;
+      }
+    }
+
+    document.getElementById("testSignIn").onclick = () => {
+      window.location.href = "https://luna.flowergrid.co.uk/api/auth/google";
+    };
+    document.getElementById("reload").onclick = load;
+    load();
+  </script>
+</body>
+</html>

@@ -1,67 +1,71 @@
-# Google OAuth setup (fix redirect_uri_mismatch)
+# Fix Google `redirect_uri_mismatch` (when Console “looks correct”)
 
-## 1. Find the correct OAuth client in Google Cloud
+## What the server sends (verified live)
 
-In Coolify you have `GOOGLE_CLIENT_ID`. After deploy, check which client the server uses:
+Luna sends this to Google:
+
+| Field | Value |
+|-------|--------|
+| **redirect_uri** | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
+| **client_id** | `1029944237902-3uki8e1l0dna4458q9n7umotnk40kq7g.apps.googleusercontent.com` |
+
+If Google still shows `redirect_uri_mismatch`, the URI is **not saved on that exact client ID** in Google Cloud (or the client type is wrong).
+
+## Diagnostic page (works after frontend rebuild)
+
+https://luna.flowergrid.co.uk/google-oauth-setup.html
+
+Or:
 
 ```bash
 curl -sS https://luna.flowergrid.co.uk/api/auth/google/status
 ```
 
-Note `clientIdSuffix` (last 20 characters). In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**, open the OAuth 2.0 Client whose **Client ID ends with those same characters**.
+## Fix A — Edit the correct OAuth client
 
-`redirect_uri_mismatch` almost always means you edited a **different** OAuth client than the one in Coolify.
+1. [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Open client ID **`1029944237902-3uki8e1l0dna4458q9n7umotnk40kq7g`** (search in the list — name may say “Potato App” or “Luna”; **ID must match**)
+3. Type must be **Web application**
+4. **Authorized redirect URIs** — exactly:
 
-## 2. Authorized redirect URIs (must match exactly)
+   `https://luna.flowergrid.co.uk/api/auth/google/callback`
 
-Add **only** these (fix URI 1 — it must include `/api`):
+5. **Authorized JavaScript origins**:
 
-| Environment | Redirect URI |
-|-------------|----------------|
-| **Production** | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
-| **Local dev** | `http://localhost:4000/api/auth/google/callback` |
+   `https://luna.flowergrid.co.uk`
 
-Remove wrong entries such as:
+6. **Save** → wait **10 minutes** → test in **incognito**
 
-- `https://luna.flowergrid.co.uk/auth/google/callback` (missing `/api`)
-- `http://localhost:4000/auth/google/callback` (missing `/api`)
+On Google’s error page, click **“see error details”** and compare `redirect_uri=` to the table above.
 
-Click **Save**. Changes can take a few minutes.
+## Fix B — Create a new Web OAuth client (most reliable)
 
-## 3. Authorized JavaScript origins
+If Fix A still fails, create a **new** client:
 
-| Environment | Origin |
-|-------------|--------|
-| **Production** | `https://luna.flowergrid.co.uk` |
-| **Local dev** | `http://localhost:5173` |
+1. Credentials → **Create credentials** → **OAuth client ID**
+2. Application type: **Web application**
+3. Redirect URI: `https://luna.flowergrid.co.uk/api/auth/google/callback`
+4. JavaScript origin: `https://luna.flowergrid.co.uk`
+5. Copy **new** Client ID + Secret into **Coolify** (replace old `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`)
+6. Set `GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback`
+7. **Redeploy** in Coolify (restart container)
+8. Add the **new** redirect URI to the **new** client only
+9. Test sign-in: https://luna.flowergrid.co.uk/api/auth/google
 
-## 4. Coolify environment variables
+## Coolify checklist
 
-```
-GOOGLE_CLIENT_ID=<same client as in step 1>
-GOOGLE_CLIENT_SECRET=<secret for that client>
-GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback
-FRONTEND_URL=https://luna.flowergrid.co.uk
-```
+- [ ] `GOOGLE_CLIENT_ID` matches the client you edited in Google Console
+- [ ] `GOOGLE_CLIENT_SECRET` is the secret for **that same** client (not an old one)
+- [ ] `GOOGLE_CALLBACK_URL` = `https://luna.flowergrid.co.uk/api/auth/google/callback`
+- [ ] Redeploy after any env change
+- [ ] Do **not** set `VITE_API_BASE=http://localhost:4000`
 
-## 5. How users sign in
+## Common mistakes
 
-Users must start here (not the callback URL):
-
-`https://luna.flowergrid.co.uk/api/auth/google`
-
-The **Sign up** button uses this URL directly in the frontend (hardcoded for `*.flowergrid.co.uk`). Old paths `/auth/google` redirect to `/api/auth/google` on the server.
-
-After changing frontend code, **rebuild** the Coolify deployment so the new JS bundle is served.
-
-## 6. Verify
-
-```bash
-curl -sS "https://luna.flowergrid.co.uk/api/auth/google" -D - -o /dev/null | grep -i location
-```
-
-The `location` header must contain:
-
-`redirect_uri=https%3A%2F%2Fluna.flowergrid.co.uk%2Fapi%2Fauth%2Fgoogle%2Fcallback`
-
-That decoded URL must appear **verbatim** in Google Console for the same client ID.
+| Mistake | Result |
+|---------|--------|
+| Edited a **different** OAuth client than Coolify `GOOGLE_CLIENT_ID` | `redirect_uri_mismatch` |
+| Client type is **Desktop** / **Android**, not **Web** | Redirect URIs ignored |
+| Redirect URI missing **`/api`** | Mismatch |
+| Changed Google Console but **did not click Save** | Mismatch |
+| Testing in normal tab with old Google session | Clear cookies / use incognito |

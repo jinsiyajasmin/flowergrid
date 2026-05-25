@@ -58,19 +58,35 @@ function isProductionDeploy() {
   );
 }
 
-/** Must match Google Console → Authorized redirect URIs exactly. */
+/** Must match Google Console → Authorized redirect URIs exactly (always HTTPS on luna). */
 function getGoogleCallbackUrl() {
   if (isProductionDeploy()) {
     return PRODUCTION_CALLBACK_URL;
   }
   const fromEnv = process.env.GOOGLE_CALLBACK_URL?.trim();
   if (fromEnv) {
-    if (fromEnv.includes('/api/auth/google/callback')) return fromEnv.replace(/\/$/, '');
-    if (fromEnv.includes('/auth/google/callback')) {
-      return fromEnv.replace('/auth/google/callback', '/api/auth/google/callback');
+    let url = fromEnv;
+    if (url.includes('/auth/google/callback') && !url.includes('/api/auth/google/callback')) {
+      url = url.replace('/auth/google/callback', '/api/auth/google/callback');
     }
+    return url.replace(/\/$/, '');
   }
   return `http://localhost:4000${GOOGLE_CALLBACK_PATH}`;
+}
+
+/** Build Google authorize URL with an explicit redirect_uri (avoids passport/proxy quirks). */
+function buildGoogleAuthorizeUrl(state) {
+  const redirectUri = getGoogleCallbackUrl();
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: getGoogleClientId(),
+    redirect_uri: redirectUri,
+    scope: 'profile email',
+    access_type: 'online',
+    include_granted_scopes: 'true',
+  });
+  if (state) params.set('state', state);
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 function getGoogleClientId() {
@@ -89,6 +105,13 @@ if (process.env.FRONTEND_URL) {
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
+  app.use((req, res, next) => {
+    const proto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    if (proto === 'http' && req.method === 'GET') {
+      return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
+    }
+    next();
+  });
 }
 
 app.use(cors({
@@ -317,27 +340,56 @@ api.get('/auth/google/status', (req, res) => {
     startUrl: isProductionDeploy()
       ? `${LIVE_SITE_URL}/api/auth/google`
       : 'http://localhost:4000/api/auth/google',
-    clientIdSuffix: clientId ? clientId.slice(-20) : null,
-    googleConsole: {
-      redirectUri: callbackUrl,
-      javascriptOrigin: isProductionDeploy()
-        ? LIVE_SITE_URL
-        : 'http://localhost:5173',
-      hint:
-        'redirect_uri_mismatch means this exact redirect URI must be added to the SAME OAuth client as GOOGLE_CLIENT_ID in Coolify (then click Save).',
-    },
+    clientId,
+    redirectUrisForGoogleConsole: [callbackUrl],
+    javascriptOriginsForGoogleConsole: [
+      isProductionDeploy() ? LIVE_SITE_URL : 'http://localhost:5173',
+    ],
+    authorizeUrlPreview: googleOAuthEnabled ? buildGoogleAuthorizeUrl() : null,
+    hint:
+      'redirect_uri_mismatch: open /api/auth/google/help — add redirectUrisForGoogleConsole to the OAuth client whose Client ID matches clientId above, then Save.',
   });
 });
 
-api.get(
-  '/auth/google',
-  requireGoogleOAuth,
-  passport.authenticate('google', { scope: googleOAuthScopes })
-);
+api.get('/auth/google/help', (req, res) => {
+  const clientId = getGoogleClientId();
+  const callbackUrl = getGoogleCallbackUrl();
+  res.type('html').send(`<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Luna Google OAuth Setup</title>
+<style>body{font-family:system-ui;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5}
+code{background:#f3f4f6;padding:2px 6px;border-radius:4px;word-break:break-all}
+ol li{margin:.5rem 0}</style></head><body>
+<h1>Fix Google redirect_uri_mismatch</h1>
+<p>In <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console → Credentials</a>,
+open the OAuth client whose <strong>Client ID</strong> matches Coolify <code>GOOGLE_CLIENT_ID</code> exactly:</p>
+<p><code>${clientId || '(not set)'}</code></p>
+<h2>Authorized redirect URIs — add this exactly</h2>
+<p><code>${callbackUrl}</code></p>
+<p>Remove wrong URIs such as <code>https://luna.flowergrid.co.uk/auth/google/callback</code> (missing <code>/api</code>).</p>
+<h2>Authorized JavaScript origins</h2>
+<p><code>${LIVE_SITE_URL}</code></p>
+<p>Click <strong>Save</strong>, wait 5 minutes, then sign in from <a href="${LIVE_SITE_URL}/api/auth/google">${LIVE_SITE_URL}/api/auth/google</a></p>
+</body></html>`);
+});
+
+api.get('/auth/google', requireGoogleOAuth, (req, res) => {
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauthState = state;
+  res.redirect(buildGoogleAuthorizeUrl(state));
+});
 
 api.get(
   '/auth/google/callback',
   requireGoogleOAuth,
+  (req, res, next) => {
+    const expectedState = req.session?.oauthState;
+    if (expectedState && req.query.state !== expectedState) {
+      console.error('Google OAuth state mismatch');
+      return res.redirect(`${googleAuthFailureRedirect()}?oauth_error=state`);
+    }
+    delete req.session.oauthState;
+    next();
+  },
   passport.authenticate('google', {
     failureRedirect: googleAuthFailureRedirect(),
   }),

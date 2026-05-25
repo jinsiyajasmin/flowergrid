@@ -13,20 +13,26 @@ Do **not** use `docker-compose.dev.yaml`, `frontend/Dockerfile.dev`, or base dir
 
 ## Environment variables
 
-Set these in Coolify → Environment Variables:
+Names must match `docker-compose.yaml` exactly. See `coolify.env.example` for a full list.
 
-```
-DATABASE_URL=<Neon or Postgres URL>
-SESSION_SECRET=<long random string>
-OPENAI_API_KEY=<your key>
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-FRONTEND_URL=https://luna.flowergrid.co.uk
-GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback
-# (Production always uses this URL in code even if env is wrong — must match Google Console.)
-```
+| Variable | Example / notes |
+|----------|-----------------|
+| `DATABASE_URL` | Neon or Coolify Postgres connection string |
+| `SESSION_SECRET` | Long random string |
+| `OPENAI_API_KEY` | Your OpenAI key |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` (optional) |
+| `CHAT_MODEL` | `gpt-4o` (optional) |
+| `EMBED_MODEL` | `text-embedding-3-small` (optional) |
+| `GOOGLE_CLIENT_ID` | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | Same OAuth client as above |
+| `GOOGLE_CALLBACK_URL` | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
+| `FRONTEND_URL` | `https://luna.flowergrid.co.uk` |
 
-Do **not** set `VITE_API_BASE=http://localhost:4000`.
+`NODE_ENV` and `PORT` are set in the compose file — you do not need to add them in Coolify unless you want to override.
+
+Do **not** set `VITE_API_BASE` in Coolify.
+
+After changing env vars → **Redeploy** (restart container).
 
 ## Deploy
 

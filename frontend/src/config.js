@@ -101,10 +101,19 @@ export async function startGoogleSignIn() {
           "Google sign-in is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify."
         );
       }
+      if (status.callbackUrl && !status.callbackUrl.includes("/api/auth/google/callback")) {
+        throw new Error(
+          `Wrong callback URL on server: ${status.callbackUrl}. Set GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback in Coolify and redeploy.`
+        );
+      }
       if (status.database !== "connected") {
         throw new Error(
           "Sign-in requires the database. Set DATABASE_URL in Coolify and redeploy."
         );
+      }
+      if (status.clientId && status.callbackUrl) {
+        console.info("Google OAuth clientId:", status.clientId);
+        console.info("Add redirect URI in Google Console:", status.callbackUrl);
       }
       const url =
         typeof status.startUrl === "string" && status.startUrl.includes("/api/auth/google")

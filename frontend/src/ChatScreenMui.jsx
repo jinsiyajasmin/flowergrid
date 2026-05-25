@@ -1831,8 +1831,9 @@ export default function ChatScreenMui() {
                                             await startGoogleSignIn();
                                         } catch (err) {
                                             setSignupError(
-                                                err?.message ||
-                                                    "Sign-in failed. Please try again."
+                                                (err?.message ||
+                                                    "Sign-in failed. Please try again.") +
+                                                " Open /google-oauth-setup.html for step-by-step Google Console fix."
                                             );
                                         }
                                     }}
