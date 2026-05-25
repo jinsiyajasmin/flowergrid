@@ -48,19 +48,33 @@ const KB_EMBED_CHUNK_OVERLAP = 200;
 const LIVE_SITE_URL = 'https://luna.flowergrid.co.uk';
 const GOOGLE_CALLBACK_PATH = '/api/auth/google/callback';
 
-/** Always use /api/auth/google/callback in production (matches Google Console + nginx). */
+const PRODUCTION_CALLBACK_URL = `${LIVE_SITE_URL}${GOOGLE_CALLBACK_PATH}`;
+
+function isProductionDeploy() {
+  return (
+    process.env.NODE_ENV === 'production' ||
+    process.env.FRONTEND_URL?.includes('luna.flowergrid.co.uk') ||
+    process.env.GOOGLE_CALLBACK_URL?.includes('luna.flowergrid.co.uk')
+  );
+}
+
+/** Must match Google Console → Authorized redirect URIs exactly. */
 function getGoogleCallbackUrl() {
-  if (process.env.NODE_ENV === 'production') {
-    return `${LIVE_SITE_URL}${GOOGLE_CALLBACK_PATH}`;
+  if (isProductionDeploy()) {
+    return PRODUCTION_CALLBACK_URL;
   }
   const fromEnv = process.env.GOOGLE_CALLBACK_URL?.trim();
   if (fromEnv) {
-    if (fromEnv.includes('/api/auth/google/callback')) return fromEnv;
+    if (fromEnv.includes('/api/auth/google/callback')) return fromEnv.replace(/\/$/, '');
     if (fromEnv.includes('/auth/google/callback')) {
       return fromEnv.replace('/auth/google/callback', '/api/auth/google/callback');
     }
   }
   return `http://localhost:4000${GOOGLE_CALLBACK_PATH}`;
+}
+
+function getGoogleClientId() {
+  return process.env.GOOGLE_CLIENT_ID?.trim() || '';
 }
 
 const allowedOrigins = [
@@ -151,56 +165,23 @@ const openai = new OpenAI({
 });
 
 const googleOAuthEnabled = Boolean(
-  process.env.GOOGLE_CLIENT_ID?.trim() &&
-    process.env.GOOGLE_CLIENT_SECRET?.trim()
+  getGoogleClientId() && process.env.GOOGLE_CLIENT_SECRET?.trim()
 );
 
-async function initializeApp() {
-  if (isInitialized) return;
-  loadFloraPrompt();
-  try {
-    await connectDB();
-    dbReady = true;
-    setDbPersistenceEnabled(true);
-    console.log('✅ Database ready');
-  } catch (err) {
-    dbReady = false;
-    setDbPersistenceEnabled(false);
-    console.error(
-      'PostgreSQL unavailable — chat uses in-memory sessions only:',
-      err?.message || err
-    );
-  }
-  isInitialized = true;
-}
+let googleStrategyConfigured = false;
 
-async function ensureKbIndex() {
-  if (kbIndexReady) return;
-  try {
-    await buildIndex();
-  } catch (err) {
-    console.error('KB index build failed (chat continues without RAG):', err);
-  }
-  kbIndexReady = true;
-}
+function configureGoogleOAuth() {
+  if (!googleOAuthEnabled || googleStrategyConfigured) return;
 
-app.use(async (req, res, next) => {
-  try {
-    await initializeApp();
-    next();
-  } catch (err) {
-    console.error('Initialization failed:', err);
-    next(err);
-  }
-});
+  const callbackURL = getGoogleCallbackUrl();
+  const clientID = getGoogleClientId();
 
-if (googleOAuthEnabled) {
   passport.use(
     new GoogleStrategy(
       {
-        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: getGoogleCallbackUrl(),
+        callbackURL,
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
@@ -238,14 +219,56 @@ if (googleOAuthEnabled) {
       }
     )
   );
-} else {
+
+  googleStrategyConfigured = true;
+  console.log(`Google OAuth client: ${clientID.slice(0, 12)}...${clientID.slice(-8)}`);
+  console.log(`Google OAuth callback: ${callbackURL}`);
+}
+
+async function initializeApp() {
+  if (isInitialized) return;
+  loadFloraPrompt();
+  configureGoogleOAuth();
+  try {
+    await connectDB();
+    dbReady = true;
+    setDbPersistenceEnabled(true);
+    console.log('✅ Database ready');
+  } catch (err) {
+    dbReady = false;
+    setDbPersistenceEnabled(false);
+    console.error(
+      'PostgreSQL unavailable — chat uses in-memory sessions only:',
+      err?.message || err
+    );
+  }
+  isInitialized = true;
+}
+
+async function ensureKbIndex() {
+  if (kbIndexReady) return;
+  try {
+    await buildIndex();
+  } catch (err) {
+    console.error('KB index build failed (chat continues without RAG):', err);
+  }
+  kbIndexReady = true;
+}
+
+app.use(async (req, res, next) => {
+  try {
+    await initializeApp();
+    next();
+  } catch (err) {
+    console.error('Initialization failed:', err);
+    next(err);
+  }
+});
+
+if (!googleOAuthEnabled) {
   console.warn(
     'Google OAuth disabled — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify'
   );
-}
-
-if (googleOAuthEnabled) {
-  console.log(`Google OAuth callback URL: ${getGoogleCallbackUrl()}`);
 }
 
 
@@ -285,11 +308,24 @@ function googleAuthFailureRedirect() {
 }
 
 api.get('/auth/google/status', (req, res) => {
+  const clientId = getGoogleClientId();
+  const callbackUrl = getGoogleCallbackUrl();
   res.json({
     enabled: googleOAuthEnabled,
     database: dbReady ? 'connected' : 'not_connected',
-    callbackUrl: getGoogleCallbackUrl(),
-    startUrl: `${process.env.NODE_ENV === 'production' ? LIVE_SITE_URL : 'http://localhost:4000'}/api/auth/google`,
+    callbackUrl,
+    startUrl: isProductionDeploy()
+      ? `${LIVE_SITE_URL}/api/auth/google`
+      : 'http://localhost:4000/api/auth/google',
+    clientIdSuffix: clientId ? clientId.slice(-20) : null,
+    googleConsole: {
+      redirectUri: callbackUrl,
+      javascriptOrigin: isProductionDeploy()
+        ? LIVE_SITE_URL
+        : 'http://localhost:5173',
+      hint:
+        'redirect_uri_mismatch means this exact redirect URI must be added to the SAME OAuth client as GOOGLE_CLIENT_ID in Coolify (then click Save).',
+    },
   });
 });
 
@@ -1344,6 +1380,7 @@ app.use((err, req, res, _next) => {
 // Always listen when running as a standalone server (Docker / local dev).
 // Skip only on Vercel serverless where the platform imports `app` without listening.
 if (process.env.VERCEL !== '1') {
+  configureGoogleOAuth();
   initializeApp().catch((err) =>
     console.error('Background init failed:', err)
   );

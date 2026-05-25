@@ -53,10 +53,14 @@ curl -sS -o /dev/null -w "%{http_code}\n" https://luna.flowergrid.co.uk/api/auth
 
 ## Google Cloud Console
 
+**→ Full guide: [GOOGLE_OAUTH.md](./GOOGLE_OAUTH.md)** (fixes `redirect_uri_mismatch`)
+
 | Field | URL |
 |-------|-----|
 | JavaScript origins | `https://luna.flowergrid.co.uk` |
 | Redirect URI | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
+
+Use `curl https://luna.flowergrid.co.uk/api/auth/google/status` and match `clientIdSuffix` to the OAuth client you edit in Google Console. Click **Save** after changes.
 
 ## Troubleshooting
 
