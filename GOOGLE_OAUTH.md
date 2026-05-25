@@ -1,71 +1,60 @@
-# Fix Google `redirect_uri_mismatch` (when Console “looks correct”)
+# Fix Google `redirect_uri_mismatch`
 
-## What the server sends (verified live)
+## Google already told you the exact problem
 
-Luna sends this to Google:
+Luna sends `redirect_uri` and `client_id` from environment variables (`GOOGLE_CALLBACK_URL` / production defaults, and `GOOGLE_CLIENT_ID`). **This cannot be fixed in application code** — you must register the redirect URI on **the same OAuth client** as `GOOGLE_CLIENT_ID` in Google Cloud Console.
 
-| Field | Value |
-|-------|--------|
-| **redirect_uri** | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
-| **client_id** | `1029944237902-3uki8e1l0dna4458q9n7umotnk40kq7g.apps.googleusercontent.com` |
+Help page (uses your configured `GOOGLE_CLIENT_ID`): https://luna.flowergrid.co.uk/api/auth/google/help
 
-If Google still shows `redirect_uri_mismatch`, the URI is **not saved on that exact client ID** in Google Cloud (or the client type is wrong).
-
-## Diagnostic page (works after frontend rebuild)
-
-https://luna.flowergrid.co.uk/google-oauth-setup.html
-
-Or:
+Or inspect live values:
 
 ```bash
 curl -sS https://luna.flowergrid.co.uk/api/auth/google/status
 ```
 
-## Fix A — Edit the correct OAuth client
+Use `clientId`, `callbackUrl`, and `googleConsoleEditUrl` from the JSON.
 
-1. [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
-2. Open client ID **`1029944237902-3uki8e1l0dna4458q9n7umotnk40kq7g`** (search in the list — name may say “Potato App” or “Luna”; **ID must match**)
-3. Type must be **Web application**
-4. **Authorized redirect URIs** — exactly:
+## Fix in 4 steps
 
-   `https://luna.flowergrid.co.uk/api/auth/google/callback`
+1. Open `/api/auth/google/help` or `googleConsoleEditUrl` from status (or [Credentials](https://console.cloud.google.com/apis/credentials) → find the client matching `GOOGLE_CLIENT_ID`).
+2. Confirm type is **Web application** (not Desktop / Android / iOS).
+3. Under **Authorized redirect URIs**, add **exactly**:
 
-5. **Authorized JavaScript origins**:
+   ```
+   https://luna.flowergrid.co.uk/api/auth/google/callback
+   ```
 
-   `https://luna.flowergrid.co.uk`
+4. Under **Authorized JavaScript origins**, add:
 
-6. **Save** → wait **10 minutes** → test in **incognito**
+   ```
+   https://luna.flowergrid.co.uk
+   ```
 
-On Google’s error page, click **“see error details”** and compare `redirect_uri=` to the table above.
+5. Click **Save** (bottom of page). Wait **10 minutes**. Test in **incognito**.
 
-## Fix B — Create a new Web OAuth client (most reliable)
+## Also check OAuth consent screen
 
-If Fix A still fails, create a **new** client:
+[OAuth consent screen](https://console.cloud.google.com/auth/branding) → **Authorized domains** → add `flowergrid.co.uk` if missing.
 
-1. Credentials → **Create credentials** → **OAuth client ID**
-2. Application type: **Web application**
-3. Redirect URI: `https://luna.flowergrid.co.uk/api/auth/google/callback`
-4. JavaScript origin: `https://luna.flowergrid.co.uk`
-5. Copy **new** Client ID + Secret into **Coolify** (replace old `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`)
-6. Set `GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback`
-7. **Redeploy** in Coolify (restart container)
-8. Add the **new** redirect URI to the **new** client only
-9. Test sign-in: https://luna.flowergrid.co.uk/api/auth/google
+## Coolify env (must match this client)
 
-## Coolify checklist
+```
+GOOGLE_CLIENT_ID=<your Web OAuth client ID from Google Console>
+GOOGLE_CLIENT_SECRET=<secret for THAT client only>
+GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback
+```
 
-- [ ] `GOOGLE_CLIENT_ID` matches the client you edited in Google Console
-- [ ] `GOOGLE_CLIENT_SECRET` is the secret for **that same** client (not an old one)
-- [ ] `GOOGLE_CALLBACK_URL` = `https://luna.flowergrid.co.uk/api/auth/google/callback`
-- [ ] Redeploy after any env change
-- [ ] Do **not** set `VITE_API_BASE=http://localhost:4000`
+## Verify Luna + database
 
-## Common mistakes
+```bash
+curl -sS https://luna.flowergrid.co.uk/api/health
+curl -sS https://luna.flowergrid.co.uk/api/auth/google/status
+```
 
-| Mistake | Result |
-|---------|--------|
-| Edited a **different** OAuth client than Coolify `GOOGLE_CLIENT_ID` | `redirect_uri_mismatch` |
-| Client type is **Desktop** / **Android**, not **Web** | Redirect URIs ignored |
-| Redirect URI missing **`/api`** | Mismatch |
-| Changed Google Console but **did not click Save** | Mismatch |
-| Testing in normal tab with old Google session | Clear cookies / use incognito |
+Need `"database":"connected"` for sign-in to complete after Google redirects back.
+
+## Still failing?
+
+Create a **new** Web OAuth client, add the redirect URI above, put the **new** Client ID + Secret in Coolify, redeploy.
+
+Reference: [Google redirect_uri_mismatch docs](https://developers.google.com/identity/protocols/oauth2/web-server#authorization-errors-redirect-uri-mismatch)

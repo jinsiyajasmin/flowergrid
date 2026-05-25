@@ -118,6 +118,10 @@ export async function startGoogleSignIn() {
         console.info("Google OAuth clientId:", status.clientId);
         console.info("Add redirect URI in Google Console:", status.callbackUrl);
       }
+      if (status.googleConsoleEditUrl) {
+        console.info("Google Console (add redirect URI):", status.googleConsoleEditUrl);
+        console.info("Redirect URI to register:", status.googleErrorShowsThisRedirectUri || status.callbackUrl);
+      }
       const url =
         typeof status.startUrl === "string" && status.startUrl.includes("/api/auth/google")
           ? status.startUrl

@@ -12,7 +12,11 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import connectDB, {
   prisma,
   normalizeDatabaseUrl,
+  isDatabaseUrlEnvSet,
+  recordDatabaseUrlConfigError,
   getLastDatabaseError,
+  DATABASE_URL_MISSING_MSG,
+  DATABASE_URL_INVALID_MSG,
   getDatabaseHostHint,
 } from './db.js';
 import {
@@ -98,6 +102,42 @@ function getGoogleClientId() {
   return process.env.GOOGLE_CLIENT_ID?.trim() || '';
 }
 
+/** Deep link to edit the OAuth client configured via GOOGLE_CLIENT_ID. */
+function getGoogleConsoleClientUrl(clientId = getGoogleClientId()) {
+  const id = clientId?.trim();
+  if (!id) return null;
+  return `https://console.cloud.google.com/apis/credentials/oauthclient/${encodeURIComponent(id)}`;
+}
+
+function getGoogleJavascriptOrigin() {
+  if (isProductionDeploy()) return LIVE_SITE_URL;
+  const fromEnv = process.env.FRONTEND_URL?.trim().replace(/\/$/, '');
+  return fromEnv || 'http://localhost:5173';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Only http(s) URLs may appear in href attributes on the OAuth help page. */
+function safeHttpHref(url, fallback = '#') {
+  const trimmed = String(url ?? '').trim();
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return escapeHtml(trimmed);
+    }
+  } catch {
+    /* invalid URL */
+  }
+  return escapeHtml(fallback);
+}
+
 const allowedOrigins = [
   LIVE_SITE_URL,
   'https://flowergrid.vercel.app',
@@ -146,7 +186,10 @@ let dbConnectAttempts = 0;
 async function ensureDatabase() {
   if (dbReady) return true;
   const url = normalizeDatabaseUrl(process.env.DATABASE_URL);
-  if (!url) return false;
+  if (!url) {
+    recordDatabaseUrlConfigError(process.env.DATABASE_URL);
+    return false;
+  }
 
   try {
     await connectDB();
@@ -162,17 +205,24 @@ async function ensureDatabase() {
 }
 
 function databaseStatusPayload() {
+  const envSet = isDatabaseUrlEnvSet(process.env.DATABASE_URL);
   const url = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  let databaseHint = null;
+  if (!dbReady) {
+    databaseHint =
+      getLastDatabaseError() ||
+      (url
+        ? 'Cannot reach PostgreSQL. For Neon add ?sslmode=require to DATABASE_URL and redeploy.'
+        : envSet
+          ? DATABASE_URL_INVALID_MSG
+          : DATABASE_URL_MISSING_MSG);
+  }
   return {
     database: dbReady ? 'connected' : 'not_connected',
-    databaseConfigured: Boolean(url),
+    databaseConfigured: envSet,
+    databaseUrlValid: Boolean(url),
     databaseHost: url ? getDatabaseHostHint(url) : null,
-    databaseHint: dbReady
-      ? null
-      : getLastDatabaseError() ||
-        (url
-          ? 'Cannot reach PostgreSQL. For Neon add ?sslmode=require to DATABASE_URL and redeploy.'
-          : 'DATABASE_URL is not set in Coolify environment variables.'),
+    databaseHint,
   };
 }
 
@@ -379,33 +429,65 @@ api.get('/auth/google/status', async (req, res) => {
       : 'http://localhost:4000/api/auth/google',
     clientId,
     redirectUrisForGoogleConsole: [callbackUrl],
-    javascriptOriginsForGoogleConsole: [
-      isProductionDeploy() ? LIVE_SITE_URL : 'http://localhost:5173',
-    ],
+    javascriptOriginsForGoogleConsole: [getGoogleJavascriptOrigin()],
     authorizeUrlPreview: googleOAuthEnabled ? buildGoogleAuthorizeUrl() : null,
+    googleConsoleEditUrl: getGoogleConsoleClientUrl(clientId),
+    googleErrorShowsThisRedirectUri: callbackUrl,
     hint:
-      'redirect_uri_mismatch: open /api/auth/google/help — add redirectUrisForGoogleConsole to the OAuth client whose Client ID matches clientId above, then Save.',
+      'redirect_uri_mismatch: open /api/auth/google/help — add the redirect URI above to that OAuth client in Google Console, then Save.',
   });
 });
 
 api.get('/auth/google/help', (req, res) => {
   const clientId = getGoogleClientId();
   const callbackUrl = getGoogleCallbackUrl();
+  const consoleUrl = getGoogleConsoleClientUrl(clientId);
+  const jsOrigin = getGoogleJavascriptOrigin();
+  const testSignInUrl = isProductionDeploy()
+    ? `${LIVE_SITE_URL}/api/auth/google`
+    : 'http://localhost:4000/api/auth/google';
+
+  const callbackSafe = escapeHtml(callbackUrl);
+  const clientIdSafe = escapeHtml(clientId || '(not set)');
+  const jsOriginSafe = escapeHtml(jsOrigin);
+  const wrongCallbackExample = escapeHtml(`${jsOrigin}/auth/google/callback`);
+  const signInHref = safeHttpHref(testSignInUrl, 'http://localhost:4000/api/auth/google');
+  const consoleHref = consoleUrl ? safeHttpHref(consoleUrl) : null;
+
+  const consoleLink = consoleHref
+    ? `<p><a class="btn" href="${consoleHref}" target="_blank" rel="noopener">Open OAuth client in Google Console</a></p>`
+    : '<div class="box"><strong>GOOGLE_CLIENT_ID</strong> is not set. Add it in Coolify environment variables, redeploy, then reopen this page.</div>';
+  const clientStatus = clientId
+    ? '<p>✓ Using <code>GOOGLE_CLIENT_ID</code> from environment.</p>'
+    : '<p><strong>Warning:</strong> <code>GOOGLE_CLIENT_ID</code> is not set — OAuth cannot work until you configure it.</p>';
   res.type('html').send(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Luna Google OAuth Setup</title>
-<style>body{font-family:system-ui;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.5}
-code{background:#f3f4f6;padding:2px 6px;border-radius:4px;word-break:break-all}
-ol li{margin:.5rem 0}</style></head><body>
-<h1>Fix Google redirect_uri_mismatch</h1>
-<p>In <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console → Credentials</a>,
-open the OAuth client whose <strong>Client ID</strong> matches Coolify <code>GOOGLE_CLIENT_ID</code> exactly:</p>
-<p><code>${clientId || '(not set)'}</code></p>
-<h2>Authorized redirect URIs — add this exactly</h2>
-<p><code>${callbackUrl}</code></p>
-<p>Remove wrong URIs such as <code>https://luna.flowergrid.co.uk/auth/google/callback</code> (missing <code>/api</code>).</p>
-<h2>Authorized JavaScript origins</h2>
-<p><code>${LIVE_SITE_URL}</code></p>
-<p>Click <strong>Save</strong>, wait 5 minutes, then sign in from <a href="${LIVE_SITE_URL}/api/auth/google">${LIVE_SITE_URL}/api/auth/google</a></p>
+<html><head><meta charset="utf-8"><title>Fix redirect_uri_mismatch — Luna</title>
+<style>
+body{font-family:system-ui;max-width:760px;margin:2rem auto;padding:0 1rem;line-height:1.55;color:#111}
+.box{background:#fef3c7;border:1px solid #f59e0b;border-radius:12px;padding:1rem;margin:1rem 0}
+.ok{background:#ecfdf5;border:1px solid #10b981;border-radius:12px;padding:1rem;margin:1rem 0}
+pre,code{background:#f3f4f6;padding:8px;border-radius:8px;word-break:break-all;font-size:13px}
+.btn{display:inline-block;margin:8px 8px 0 0;padding:10px 16px;background:#111827;color:#fff;text-decoration:none;border-radius:8px}
+</style></head><body>
+<h1>Fix Google <code>redirect_uri_mismatch</code></h1>
+<div class="ok"><strong>Luna redirect URI.</strong> Register this exact URI on the OAuth client whose Client ID matches <code>GOOGLE_CLIENT_ID</code>:<br>
+<pre>${callbackSafe}</pre>
+This is usually a Google Console configuration issue, not an application bug.</div>
+<h2>Step 1 — Open your OAuth client</h2>
+${consoleLink}
+<p>Client ID from <code>GOOGLE_CLIENT_ID</code> (must match the client you edit in Console):</p>
+<pre>${clientIdSafe}</pre>
+${clientStatus}
+<h2>Step 2 — Authorized redirect URIs</h2>
+<p>Click <strong>+ Add URI</strong> and paste <strong>exactly</strong> (no spaces, no trailing slash):</p>
+<pre>${callbackSafe}</pre>
+<p>Remove wrong entries that omit <code>/api</code> (e.g. <code>${wrongCallbackExample}</code>).</p>
+<h2>Step 3 — Authorized JavaScript origins</h2>
+<pre>${jsOriginSafe}</pre>
+<h2>Step 4 — Save and wait</h2>
+<p>Click <strong>Save</strong> at the bottom. Wait 5–10 minutes. Test in <strong>incognito</strong>:</p>
+<p><a class="btn" href="${signInHref}">Test Google sign-in</a></p>
+<p><a href="https://developers.google.com/identity/protocols/oauth2/web-server#authorization-errors-redirect-uri-mismatch">Google docs: redirect_uri_mismatch</a></p>
 </body></html>`);
 });
 
