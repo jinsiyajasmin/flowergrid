@@ -1,5 +1,7 @@
 # Coolify deploy checklist (fix chat + signup)
 
+See also **[COOLIFY.md](./COOLIFY.md)** for a short Coolify-only guide.
+
 ## Quick check (run after deploy)
 
 ```bash

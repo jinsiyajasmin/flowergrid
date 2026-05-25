@@ -40,6 +40,8 @@ API base locally: `http://localhost:4000/api`
 
 ## Deploy on Coolify (recommended: one container)
 
+**→ Step-by-step: [COOLIFY.md](./COOLIFY.md)**
+
 Use **`docker-compose.yaml`** (production) or build root **`Dockerfile`** — **nginx + Express in one container**:
 
 - Public site: `https://luna.flowergrid.co.uk` (port **80**)

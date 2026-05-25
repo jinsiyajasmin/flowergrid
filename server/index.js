@@ -72,13 +72,17 @@ app.use(cors({
     if (/^https:\/\/([a-z0-9-]+\.)*flowergrid\.co\.uk$/i.test(normalized)) {
       return callback(null, true);
     }
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
+    return callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
+
+let KB_TEXTS = [];
+let isInitialized = false;
+let dbReady = false;
+let kbIndexReady = false;
 
 app.get('/health', (req, res) => res.json({ status: 'alive' }));
 app.get('/api/health', (req, res) => {
@@ -98,9 +102,14 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+const sessionSecret = process.env.SESSION_SECRET?.trim();
+if (process.env.NODE_ENV === 'production' && !sessionSecret) {
+  console.warn('WARNING: SESSION_SECRET is not set — set it in Coolify for secure sessions');
+}
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'flora-secret',
+    secret: sessionSecret || 'flora-dev-only-change-me',
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -124,11 +133,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   baseURL: process.env.OPENAI_BASE_URL || undefined
 });
-
-let KB_TEXTS = [];
-let isInitialized = false;
-let dbReady = false;
-let kbIndexReady = false;
 
 const googleOAuthEnabled = Boolean(
   process.env.GOOGLE_CLIENT_ID?.trim() &&

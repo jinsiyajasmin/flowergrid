@@ -1,6 +1,4 @@
-# Alias of docker-compose.yaml (same production stack).
-# Coolify default path is often /docker-compose.yaml
-
+# Alias of docker-compose.yaml
 services:
   app:
     build:
@@ -9,6 +7,16 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:80/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     environment:
       NODE_ENV: production
       PORT: 4000

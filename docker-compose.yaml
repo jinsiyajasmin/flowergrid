@@ -1,7 +1,4 @@
-# Production (Coolify): one container — nginx + Express API on /api
-# Coolify: Docker Compose Location = docker-compose.yaml, Base Directory = /
-# Public URL → port 80
-
+# Coolify production — Base Directory: / , Compose file: docker-compose.yaml , Port: 80
 services:
   app:
     build:
@@ -10,6 +7,16 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:80/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     environment:
       NODE_ENV: production
       PORT: 4000

@@ -1,6 +1,4 @@
-# Production (same as docker-compose.yaml). Coolify often expects .yaml — use that file in Coolify UI.
-# Local: docker compose -f docker-compose.yaml up --build
-
+# Same as docker-compose.yaml (Coolify may use either extension).
 services:
   app:
     build:
@@ -9,6 +7,16 @@ services:
     restart: unless-stopped
     expose:
       - "80"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:80/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     environment:
       NODE_ENV: production
       PORT: 4000

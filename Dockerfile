@@ -28,9 +28,13 @@ WORKDIR /app
 
 COPY --from=server-build /server ./server
 COPY --from=frontend-build /build/dist /usr/share/nginx/html
-COPY deploy/nginx.coolify.conf /etc/nginx/conf.d/default.conf
+COPY deploy/nginx.conf /etc/nginx/nginx.conf
+COPY deploy/nginx.site.conf /etc/nginx/http.d/flowergrid.conf
 COPY deploy/start.sh /start.sh
-RUN chmod +x /start.sh && rm -f /etc/nginx/http.d/default.conf 2>/dev/null || true
+RUN chmod +x /start.sh \
+    && rm -f /etc/nginx/http.d/default.conf /etc/nginx/conf.d/default.conf 2>/dev/null || true \
+    && mkdir -p /var/log/nginx /var/lib/nginx/tmp \
+    && chown -R nginx:nginx /var/log/nginx /var/lib/nginx
 
 EXPOSE 80
 
