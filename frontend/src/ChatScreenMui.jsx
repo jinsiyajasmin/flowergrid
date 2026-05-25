@@ -28,7 +28,7 @@ import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
 import ScaleLetterText from "./components/ScaleLetterText";
-import { apiPath } from "./config";
+import { apiPath, deployMisconfigurationMessage, startGoogleSignIn } from "./config";
 import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
@@ -122,6 +122,8 @@ async function fetchSessionStatus(userId) {
         credentials: "include",
         headers: userId ? { "x-user-id": userId } : {},
     });
+    const deployMsg = deployMisconfigurationMessage(res);
+    if (deployMsg) throw new Error(deployMsg);
     if (!res.ok) throw new Error("Session status failed");
     return res.json();
 }
@@ -206,6 +208,7 @@ export default function ChatScreenMui() {
     const [splashComplete, setSplashComplete] = useState(false);
     const [signupAnchorEl, setSignupAnchorEl] = useState(null);
     const signupOpen = Boolean(signupAnchorEl);
+    const [signupError, setSignupError] = useState(null);
     const [user, setUser] = useState(null);
     const [chatSessionId, setChatSessionId] = useState(null);
     const chatSessionIdRef = useRef(null);
@@ -628,6 +631,9 @@ export default function ChatScreenMui() {
             const raw = await resp.text();
 
             if (!resp.ok) {
+                const deployMsg = deployMisconfigurationMessage(resp);
+                if (deployMsg) throw new Error(deployMsg);
+
                 let body;
                 try {
                     body = JSON.parse(raw);
@@ -1796,10 +1802,32 @@ export default function ChatScreenMui() {
                                     Sign up
                                 </Typography>
 
+                                {signupError && (
+                                    <Typography
+                                        sx={{
+                                            mb: 1.5,
+                                            fontSize: 12,
+                                            color: "#B91C1C",
+                                            textAlign: "center",
+                                            whiteSpace: "pre-wrap",
+                                        }}
+                                    >
+                                        {signupError}
+                                    </Typography>
+                                )}
+
                                 <Box
-                                    onClick={() => {
-                                        handleSignupClose();
-                                        window.location.href = apiPath("/auth/google");
+                                    onClick={async () => {
+                                        setSignupError(null);
+                                        try {
+                                            await startGoogleSignIn();
+                                            handleSignupClose();
+                                        } catch (err) {
+                                            setSignupError(
+                                                err?.message ||
+                                                    "Sign-in failed. Please try again."
+                                            );
+                                        }
                                     }}
                                     sx={{
                                         width: "100%",

@@ -47,3 +47,65 @@ export function getFrontendUrl() {
 }
 
 export const FRONTEND_URL = LIVE_SITE_URL;
+
+const DEPLOY_HINT =
+  "The API is not running. In Coolify use repository root as Base Directory and Dockerfile = Dockerfile, then rebuild.";
+
+/** True when the live site is serving Vite dev or frontend-only (no Express API). */
+export function isWrongProductionDeploy(response) {
+  if (!response) return false;
+  const ct = (response.headers.get("content-type") || "").toLowerCase();
+  if (response.status === 500 && !ct.includes("application/json")) return true;
+  if (response.status === 404 && ct.includes("text/html")) return true;
+  return false;
+}
+
+export function deployMisconfigurationMessage(response) {
+  if (isWrongProductionDeploy(response)) return DEPLOY_HINT;
+  return null;
+}
+
+/** Verify API is reachable, then start Google OAuth (avoids silent 500 on wrong deploy). */
+export async function startGoogleSignIn() {
+  let res;
+  try {
+    res = await fetch(apiPath("/health"), { credentials: "include" });
+  } catch {
+    throw new Error(
+      "Cannot reach the API. In Coolify use Base Directory = repo root and docker-compose.yml or Dockerfile, then rebuild."
+    );
+  }
+
+  const deployMsg = deployMisconfigurationMessage(res);
+  if (deployMsg) throw new Error(deployMsg);
+
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (!res.ok || !ct.includes("application/json")) {
+    throw new Error(DEPLOY_HINT);
+  }
+
+  try {
+    const statusRes = await fetch(apiPath("/auth/google/status"), {
+      credentials: "include",
+    });
+    if (statusRes.ok) {
+      const status = await statusRes.json();
+      if (!status.enabled) {
+        throw new Error(
+          "Google sign-in is not configured on the server. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify."
+        );
+      }
+      if (status.database !== "connected") {
+        throw new Error(
+          "Sign-in requires the database. Set DATABASE_URL in Coolify and redeploy."
+        );
+      }
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("Google")) throw e;
+    if (e instanceof Error && e.message.includes("database")) throw e;
+    // status endpoint missing on old deploy — still try redirect
+  }
+
+  window.location.href = apiPath("/auth/google");
+}

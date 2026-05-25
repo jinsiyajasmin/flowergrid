@@ -1,7 +1,14 @@
-# LOCAL DEV ONLY — do not use for Coolify production (no API; breaks /api/chat and signup)
+# LOCAL DEV ONLY — Coolify must use repo-root Dockerfile (nginx + Express API).
 FROM node:20-alpine
 
 WORKDIR /app
+
+# Coolify sets NODE_ENV=production on builds — fail fast instead of serving a broken site.
+RUN if [ "$NODE_ENV" = "production" ]; then \
+  echo "ERROR: Do not use frontend/Dockerfile.dev for production."; \
+  echo "Coolify: Base Directory = repository root, Dockerfile = Dockerfile"; \
+  exit 1; \
+  fi
 
 COPY package.json package-lock.json ./
 RUN npm ci

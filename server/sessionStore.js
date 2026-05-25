@@ -39,6 +39,12 @@ function inferPractitionerSuggested(messages) {
 /** @type {Map<string, { shortMessages: object[], fullMessages: object[], guestExhausted: boolean, practitionerSuggested: boolean, userId: string | null }>} */
 const memoryCache = new Map();
 
+let dbPersistenceEnabled = true;
+
+export function setDbPersistenceEnabled(enabled) {
+  dbPersistenceEnabled = Boolean(enabled);
+}
+
 function normalizeMessages(messages) {
   if (!Array.isArray(messages)) return [];
   return messages
@@ -60,37 +66,49 @@ function cacheFromRow(row) {
 }
 
 async function loadFromDb(sessionId) {
-  return prisma.chatSession.findUnique({ where: { sessionId } });
+  if (!dbPersistenceEnabled) return null;
+  try {
+    return await prisma.chatSession.findUnique({ where: { sessionId } });
+  } catch (err) {
+    console.error('loadFromDb failed:', err?.message || err);
+    return null;
+  }
 }
 
 async function persistSession(sessionId, state) {
   const shortMessages = state.shortMessages.slice(-SESSION_MAX_MESSAGES);
   const fullMessages = state.fullMessages;
 
-  await prisma.chatSession.upsert({
-    where: { sessionId },
-    create: {
-      sessionId,
-      userId: state.userId,
-      shortMessages,
-      fullMessages,
-      guestExhausted: state.guestExhausted,
-      practitionerSuggested: state.practitionerSuggested,
-    },
-    update: {
-      userId: state.userId ?? undefined,
-      shortMessages,
-      fullMessages,
-      guestExhausted: state.guestExhausted,
-      practitionerSuggested: state.practitionerSuggested,
-    },
-  });
-
   memoryCache.set(sessionId, {
     ...state,
     shortMessages,
     fullMessages,
   });
+
+  if (!dbPersistenceEnabled) return;
+
+  try {
+    await prisma.chatSession.upsert({
+      where: { sessionId },
+      create: {
+        sessionId,
+        userId: state.userId,
+        shortMessages,
+        fullMessages,
+        guestExhausted: state.guestExhausted,
+        practitionerSuggested: state.practitionerSuggested,
+      },
+      update: {
+        userId: state.userId ?? undefined,
+        shortMessages,
+        fullMessages,
+        guestExhausted: state.guestExhausted,
+        practitionerSuggested: state.practitionerSuggested,
+      },
+    });
+  } catch (err) {
+    console.error('persistSession failed:', err?.message || err);
+  }
 }
 
 export async function ensureSession(sessionId, userId = null) {
@@ -202,6 +220,7 @@ export async function resumeSession(sessionId, messages, userId) {
 export async function clearSession(sessionId) {
   if (!sessionId) return;
   memoryCache.delete(sessionId);
+  if (!dbPersistenceEnabled) return;
   try {
     await prisma.chatSession.delete({ where: { sessionId } });
   } catch {
@@ -210,15 +229,19 @@ export async function clearSession(sessionId) {
 }
 
 export async function syncSessionFromSummary(sessionId, userId) {
-  if (!sessionId || !userId) return;
+  if (!sessionId || !userId || !dbPersistenceEnabled) return;
 
-  const summary = await prisma.chatSummary.findUnique({
-    where: {
-      userId_sessionId: { userId, sessionId },
-    },
-  });
+  try {
+    const summary = await prisma.chatSummary.findUnique({
+      where: {
+        userId_sessionId: { userId, sessionId },
+      },
+    });
 
-  if (summary?.messages) {
-    await resumeSession(sessionId, summary.messages, userId);
+    if (summary?.messages) {
+      await resumeSession(sessionId, summary.messages, userId);
+    }
+  } catch (err) {
+    console.error('syncSessionFromSummary failed:', err?.message || err);
   }
 }

@@ -23,6 +23,7 @@ import {
   setPractitionerSuggested,
   isGuestExhausted as isSessionGuestExhausted,
   setGuestExhausted,
+  setDbPersistenceEnabled,
 } from './sessionStore.js';
 import { fileURLToPath } from 'url';
 
@@ -79,6 +80,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 
+app.get('/health', (req, res) => res.json({ status: 'alive' }));
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'alive',
+    ready: isInitialized,
+    database: dbReady ? 'connected' : 'not_connected',
+  });
+});
+
 app.get('/', (req, res) => res.send("FlowerGrid API is running"));
 
 app.use((req, res, next) => {
@@ -120,22 +130,27 @@ let isInitialized = false;
 let dbReady = false;
 let kbIndexReady = false;
 
-const healthJson = (req, res) => {
-  res.json({
-    status: 'alive',
-    ready: isInitialized,
-    database: dbReady ? 'connected' : 'not_connected',
-  });
-};
-
-app.get('/health', healthJson);
-app.get('/api/health', healthJson);
+const googleOAuthEnabled = Boolean(
+  process.env.GOOGLE_CLIENT_ID?.trim() &&
+    process.env.GOOGLE_CLIENT_SECRET?.trim()
+);
 
 async function initializeApp() {
   if (isInitialized) return;
   loadFloraPrompt();
-  await connectDB();
-  dbReady = true;
+  try {
+    await connectDB();
+    dbReady = true;
+    setDbPersistenceEnabled(true);
+    console.log('✅ Database ready');
+  } catch (err) {
+    dbReady = false;
+    setDbPersistenceEnabled(false);
+    console.error(
+      'PostgreSQL unavailable — chat uses in-memory sessions only:',
+      err?.message || err
+    );
+  }
   isInitialized = true;
 }
 
@@ -155,58 +170,63 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Initialization failed:', err);
-    res.status(503).json({
-      error: 'Database unavailable',
-      hint: 'Set DATABASE_URL in Coolify to your Postgres connection string.',
-      message:
-        process.env.NODE_ENV === 'production'
-          ? undefined
-          : err.message,
-    });
+    next(err);
   }
 });
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL:
-        process.env.GOOGLE_CALLBACK_URL ||
-        (process.env.NODE_ENV === 'production'
-          ? `${LIVE_SITE_URL}/api/auth/google/callback`
-          : 'http://localhost:4000/auth/google/callback'),
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      try {
-        const existingUser = await prisma.user.findUnique({
-          where: { googleId: profile.id },
-        });
-
-        if (existingUser) {
-          const updatedUser = await prisma.user.update({
-            where: { id: existingUser.id },
-            data: { lastLogin: new Date() },
+if (googleOAuthEnabled) {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL:
+          process.env.GOOGLE_CALLBACK_URL ||
+          (process.env.NODE_ENV === 'production'
+            ? `${LIVE_SITE_URL}/api/auth/google/callback`
+            : 'http://localhost:4000/api/auth/google/callback'),
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          if (!dbReady) {
+            return done(
+              new Error('Database is not available for sign-in'),
+              null
+            );
+          }
+          const existingUser = await prisma.user.findUnique({
+            where: { googleId: profile.id },
           });
-          return done(null, updatedUser);
+
+          if (existingUser) {
+            const updatedUser = await prisma.user.update({
+              where: { id: existingUser.id },
+              data: { lastLogin: new Date() },
+            });
+            return done(null, updatedUser);
+          }
+
+          const newUser = await prisma.user.create({
+            data: {
+              googleId: profile.id,
+              name: profile.displayName,
+              email: profile.emails?.[0]?.value,
+              avatar: profile.photos?.[0]?.value,
+            },
+          });
+
+          return done(null, newUser);
+        } catch (err) {
+          return done(err, null);
         }
-
-        const newUser = await prisma.user.create({
-          data: {
-            googleId: profile.id,
-            name: profile.displayName,
-            email: profile.emails?.[0]?.value,
-            avatar: profile.photos?.[0]?.value,
-          },
-        });
-
-        return done(null, newUser);
-      } catch (err) {
-        return done(err, null);
       }
-    }
-  )
-);
+    )
+  );
+} else {
+  console.warn(
+    'Google OAuth disabled — set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify'
+  );
+}
 
 
 passport.serializeUser((user, done) => {
@@ -219,15 +239,64 @@ passport.deserializeUser((user, done) => {
 
 const api = express.Router();
 
+function requireGoogleOAuth(req, res, next) {
+  if (!googleOAuthEnabled) {
+    return res.status(503).json({
+      error: 'Google sign-in is not configured',
+      hint: 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify.',
+    });
+  }
+  if (!dbReady) {
+    return res.status(503).json({
+      error: 'Sign-in requires the database',
+      hint: 'Set DATABASE_URL in Coolify and redeploy.',
+    });
+  }
+  next();
+}
+
+function googleAuth(options) {
+  return (req, res, next) => {
+    passport.authenticate('google', options)(req, res, (err) => {
+      if (err) {
+        console.error('Google OAuth error:', err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: 'Google sign-in failed',
+            hint: 'Check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_CALLBACK_URL in Coolify.',
+            message:
+              process.env.NODE_ENV === 'production' ? undefined : err.message,
+          });
+        }
+        return;
+      }
+      if (res.headersSent) return;
+      next();
+    });
+  };
+}
+
+api.get('/auth/google/status', (req, res) => {
+  res.json({
+    enabled: googleOAuthEnabled,
+    database: dbReady ? 'connected' : 'not_connected',
+    callbackUrl:
+      process.env.GOOGLE_CALLBACK_URL ||
+      (process.env.NODE_ENV === 'production'
+        ? `${LIVE_SITE_URL}/api/auth/google/callback`
+        : 'http://localhost:4000/api/auth/google/callback'),
+  });
+});
+
 api.get(
   '/auth/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-  })
+  requireGoogleOAuth,
+  googleAuth({ scope: ['profile', 'email'] })
 );
 api.get(
   '/auth/google/callback',
-  passport.authenticate('google', {
+  requireGoogleOAuth,
+  googleAuth({
     failureRedirect:
       process.env.FRONTEND_URL?.replace(/\/$/, '') || LIVE_SITE_URL,
   }),
@@ -954,8 +1023,8 @@ api.post('/chat', async (req, res) => {
   } catch (err) {
     console.error('Chat error:', err);
     const isDb =
-      err?.code?.startsWith?.('P') ||
-      /connect|database|prisma/i.test(String(err?.message));
+      (typeof err?.code === 'string' && err.code.startsWith('P')) ||
+      /prisma|postgresql|database_url/i.test(String(err?.message || ''));
     res.status(isDb ? 503 : 500).json({
       error: isDb ? 'Database error' : 'Server error',
       hint: isDb
@@ -1275,6 +1344,9 @@ app.use((err, req, res, _next) => {
 // Always listen when running as a standalone server (Docker / local dev).
 // Skip only on Vercel serverless where the platform imports `app` without listening.
 if (process.env.VERCEL !== '1') {
+  initializeApp().catch((err) =>
+    console.error('Background init failed:', err)
+  );
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌼 Luna API listening on 0.0.0.0:${PORT} (routes under /api)`);
   });

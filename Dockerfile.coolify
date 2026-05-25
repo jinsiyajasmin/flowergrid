@@ -28,7 +28,7 @@ COPY --from=server-build /server ./server
 COPY --from=frontend-build /build/dist /usr/share/nginx/html
 COPY deploy/nginx.coolify.conf /etc/nginx/conf.d/default.conf
 COPY deploy/start.sh /start.sh
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh && rm -f /etc/nginx/http.d/default.conf 2>/dev/null || true
 
 EXPOSE 80
 

@@ -1,5 +1,6 @@
-# Deprecated alias — prefer docker-compose.yml (same content).
-# Coolify: Docker Compose build pack, Base Directory = /, file = docker-compose.yml
+# Production (Coolify): one container — nginx + Express API on /api
+# Coolify: Build pack = Docker Compose, Base Directory = /, this file = docker-compose.yml
+# Public URL → port 80
 
 services:
   app:

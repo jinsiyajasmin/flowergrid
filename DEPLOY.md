@@ -1,5 +1,25 @@
 # Coolify deploy checklist (fix chat + signup)
 
+## Quick check (run after deploy)
+
+```bash
+curl -sS https://luna.flowergrid.co.uk/api/health
+```
+
+**Must return JSON:** `{"status":"alive",...}`
+
+| What you see | Fix |
+|--------------|-----|
+| Empty body + HTTP 500 | **Wrong image** — Vite dev (`frontend/Dockerfile.dev`). Use root `Dockerfile` and rebuild. |
+| HTML / React page | SPA-only build — same fix as above. |
+| JSON `alive` | API is up — set `DATABASE_URL`, `OPENAI_API_KEY`, Google OAuth in Coolify. |
+
+```bash
+curl -sS https://luna.flowergrid.co.uk/api/auth/google/status
+```
+
+Sign-up needs `"enabled":true` and `"database":"connected"`. Then `GET /api/auth/google` should return **302** to Google (not 500).
+
 ## If the browser calls `localhost:4000` on the live site
 
 Coolify is running **Vite dev** (`npm run dev`) or `VITE_API_BASE` is set to a localhost URL. Fix:
@@ -21,8 +41,8 @@ Open: `https://luna.flowergrid.co.uk/api/health`
 ## Correct Coolify settings
 
 1. **Repository root** as base directory (`/`), **not** `/frontend`
-2. **Dockerfile:** `Dockerfile` (at repo root) **or** Compose: `docker-compose.coolify.yaml`
-3. **Do not** use `frontend/Dockerfile.dev` or start command `npm run dev`
+2. **Docker Compose file:** `docker-compose.yml` **or** Dockerfile: `Dockerfile` (repo root)
+3. **Do not** use `docker-compose.dev.yaml`, `frontend/Dockerfile.dev`, or `npm run dev`
 4. **One domain:** `luna.flowergrid.co.uk` → port **80**
 5. **Environment variables:**
 

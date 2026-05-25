@@ -1,5 +1,5 @@
-# Local development only (includes Postgres).
-# For Coolify / external database, use docker-compose.coolify.yaml instead.
+# Local development only (Postgres + API + Vite dev).
+# Do NOT point Coolify at this file — use docker-compose.yml (production).
 
 services:
   postgres:
@@ -31,7 +31,7 @@ services:
       - ./.env
     environment:
       DATABASE_URL: postgresql://flowergrid:flowergrid@postgres:5432/flowergrid?schema=public
-      GOOGLE_CALLBACK_URL: http://localhost:4000/auth/google/callback
+      GOOGLE_CALLBACK_URL: http://localhost:4000/api/auth/google/callback
       FRONTEND_URL: http://localhost:5173
       NODE_ENV: development
     depends_on:
@@ -46,7 +46,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_BASE: http://localhost:4000/api
+      VITE_API_PROXY: http://server:4000
     depends_on:
       - server
 

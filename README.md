@@ -4,10 +4,10 @@ Luna wellness chatbot — React frontend + Express API + PostgreSQL (Prisma).
 
 ## Local development (Docker)
 
-Uses `docker-compose.yaml` in the project root.
+Uses `docker-compose.dev.yaml` in the project root.
 
 ```bash
-docker compose up --build -d
+docker compose -f docker-compose.dev.yaml up --build -d
 ```
 
 - Frontend: http://localhost:5173
@@ -40,16 +40,17 @@ API base locally: `http://localhost:4000/api`
 
 ## Deploy on Coolify (recommended: one container)
 
-Use **`docker-compose.coolify.yaml`** or build **`Dockerfile.coolify`** — this runs **nginx + Express in a single container**:
+Use **`docker-compose.yml`** (production) or build root **`Dockerfile`** — **nginx + Express in one container**:
 
 - Public site: `https://luna.flowergrid.co.uk` (port **80**)
 - All API routes: `https://luna.flowergrid.co.uk/api/...` (e.g. `/api/chat`, `/api/auth/google`)
 
 ### Coolify setup
 
-1. Docker Compose file: `docker-compose.coolify.yaml` (one service: `app`)
-2. Domain: **`luna.flowergrid.co.uk`** → port **80**
-3. Environment variables:
+1. Build pack: **Docker Compose** — file `docker-compose.yml` (or Dockerfile at repo root). Base Directory: **`/`** (not `/frontend`)
+2. Do **not** use `docker-compose.dev.yaml` (Vite dev — breaks `/api/auth/google`)
+3. Domain: **`luna.flowergrid.co.uk`** → port **80**
+4. Environment variables:
 
    | Variable | Value |
    |----------|--------|
@@ -60,14 +61,19 @@ Use **`docker-compose.coolify.yaml`** or build **`Dockerfile.coolify`** — this
    | `GOOGLE_CALLBACK_URL` | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Google Cloud |
 
-4. Do **not** set a separate backend domain. Leave `VITE_API_BASE` empty (defaults to `/api` in the build).
+5. Do **not** set a separate backend domain. Leave `VITE_API_BASE` empty (defaults to `/api` in the build).
 
-5. **Redeploy** after env changes.
+6. **Redeploy** with **Build** (not restart only) after any change.
 
 ### Verify after deploy
 
-Open: `https://luna.flowergrid.co.uk/api/health`  
-Expected: `{"status":"alive"}`
+```bash
+curl -sS https://luna.flowergrid.co.uk/api/health
+curl -sS https://luna.flowergrid.co.uk/api/auth/google/status
+```
+
+Expected: JSON with `"status":"alive"` and `"enabled":true` (when Google env vars are set).  
+`GET /api/auth/google` should **redirect** to Google (302), not return 500.
 
 ### Google OAuth console (required)
 
