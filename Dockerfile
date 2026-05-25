@@ -7,8 +7,7 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
-ARG VITE_API_BASE=/api
-ENV VITE_API_BASE=$VITE_API_BASE
+# Do not set VITE_API_BASE to localhost — runtime config.js uses luna.flowergrid.co.uk on live.
 RUN npm run build
 
 FROM node:20-alpine AS server-build

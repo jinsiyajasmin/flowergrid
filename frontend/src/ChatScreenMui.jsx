@@ -28,7 +28,12 @@ import AnimateIcon from "./components/AnimateIcon";
 import AnimatedXIcon from "./components/AnimatedXIcon";
 import TypingAnimation from "./components/TypingAnimation";
 import ScaleLetterText from "./components/ScaleLetterText";
-import { apiPath, deployMisconfigurationMessage, startGoogleSignIn } from "./config";
+import {
+    apiPath,
+    deployMisconfigurationMessage,
+    getGoogleSignInUrl,
+    startGoogleSignIn,
+} from "./config";
 import SplashScreen from "./components/SplashScreen";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/DeleteOutline"; // or Delete
@@ -1817,11 +1822,13 @@ export default function ChatScreenMui() {
                                 )}
 
                                 <Box
-                                    onClick={async () => {
+                                    component="a"
+                                    href={getGoogleSignInUrl()}
+                                    onClick={async (e) => {
+                                        e.preventDefault();
                                         setSignupError(null);
                                         try {
                                             await startGoogleSignIn();
-                                            handleSignupClose();
                                         } catch (err) {
                                             setSignupError(
                                                 err?.message ||
@@ -1830,6 +1837,7 @@ export default function ChatScreenMui() {
                                         }
                                     }}
                                     sx={{
+                                        textDecoration: "none",
                                         width: "100%",
                                         display: "flex",
                                         alignItems: "center",

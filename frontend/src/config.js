@@ -4,7 +4,7 @@ export const API_PREFIX = "/api";
 
 function isBrowserLocalhost() {
   if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
+  const host = window.location.hostname.toLowerCase();
   return (
     host === "localhost" ||
     host === "127.0.0.1" ||
@@ -13,15 +13,25 @@ function isBrowserLocalhost() {
   );
 }
 
+/** True when the app is served on flowergrid production (luna, etc.). */
+function isLiveFlowergrid() {
+  if (typeof window === "undefined") return false;
+  return window.location.hostname.toLowerCase().endsWith("flowergrid.co.uk");
+}
+
 /**
- * Live: https://luna.flowergrid.co.uk/api
+ * API base URL for fetch() calls.
+ * Live flowergrid: always https://luna.flowergrid.co.uk/api (never localhost, never VITE_*).
  * Local: http://localhost:4000/api
- * Never uses VITE_API_BASE on the live site (avoids baked-in localhost from Coolify).
+ * Other hosts: same-origin /api
  */
 export function getApiBase() {
   if (typeof window !== "undefined") {
     if (isBrowserLocalhost()) {
       return "http://localhost:4000/api";
+    }
+    if (isLiveFlowergrid()) {
+      return `${LIVE_SITE_URL}/api`;
     }
     return `${window.location.origin}${API_PREFIX}`;
   }
@@ -35,9 +45,21 @@ export function apiPath(path) {
   return `${base}${p}`;
 }
 
-/** @deprecated Use getApiBase() or apiPath() — evaluated per call */
+/**
+ * Google OAuth entry URL — use this for Sign up (not the callback URL).
+ * Production is fixed so signup never points at localhost or /auth/ without /api.
+ */
+export function getGoogleSignInUrl() {
+  if (typeof window !== "undefined" && isBrowserLocalhost()) {
+    return "http://localhost:4000/api/auth/google";
+  }
+  return `${LIVE_SITE_URL}/api/auth/google`;
+}
+
+/** @deprecated Use getApiBase() or apiPath() */
 export function getFrontendUrl() {
   if (typeof window !== "undefined" && !isBrowserLocalhost()) {
+    if (isLiveFlowergrid()) return LIVE_SITE_URL;
     return window.location.origin;
   }
   if (isBrowserLocalhost()) {
@@ -51,7 +73,6 @@ export const FRONTEND_URL = LIVE_SITE_URL;
 const DEPLOY_HINT =
   "The API is not running. In Coolify use Base Directory = / and docker-compose.yaml (or Dockerfile), then rebuild.";
 
-/** True when the live site is serving Vite dev or frontend-only (no Express API). */
 export function isWrongProductionDeploy(response) {
   if (!response) return false;
   const ct = (response.headers.get("content-type") || "").toLowerCase();
@@ -65,24 +86,9 @@ export function deployMisconfigurationMessage(response) {
   return null;
 }
 
-/** Verify API is reachable, then start Google OAuth (avoids silent 500 on wrong deploy). */
+/** Redirect to Google sign-in (production URL is hardcoded for flowergrid.co.uk). */
 export async function startGoogleSignIn() {
-  let res;
-  try {
-    res = await fetch(apiPath("/health"), { credentials: "include" });
-  } catch {
-    throw new Error(
-      "Cannot reach the API. In Coolify use Base Directory = repo root and docker-compose.yaml or Dockerfile, then rebuild."
-    );
-  }
-
-  const deployMsg = deployMisconfigurationMessage(res);
-  if (deployMsg) throw new Error(deployMsg);
-
-  const ct = (res.headers.get("content-type") || "").toLowerCase();
-  if (!res.ok || !ct.includes("application/json")) {
-    throw new Error(DEPLOY_HINT);
-  }
+  const fallbackUrl = getGoogleSignInUrl();
 
   try {
     const statusRes = await fetch(apiPath("/auth/google/status"), {
@@ -92,7 +98,7 @@ export async function startGoogleSignIn() {
       const status = await statusRes.json();
       if (!status.enabled) {
         throw new Error(
-          "Google sign-in is not configured on the server. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify."
+          "Google sign-in is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify."
         );
       }
       if (status.database !== "connected") {
@@ -100,12 +106,18 @@ export async function startGoogleSignIn() {
           "Sign-in requires the database. Set DATABASE_URL in Coolify and redeploy."
         );
       }
+      const url =
+        typeof status.startUrl === "string" && status.startUrl.includes("/api/auth/google")
+          ? status.startUrl
+          : fallbackUrl;
+      window.location.assign(url);
+      return;
     }
+    const deployMsg = deployMisconfigurationMessage(statusRes);
+    if (deployMsg) throw new Error(deployMsg);
   } catch (e) {
-    if (e instanceof Error && e.message.includes("Google")) throw e;
-    if (e instanceof Error && e.message.includes("database")) throw e;
-    // status endpoint missing on old deploy — still try redirect
+    if (e instanceof Error && !e.message.includes("fetch")) throw e;
   }
 
-  window.location.href = apiPath("/auth/google");
+  window.location.assign(fallbackUrl);
 }

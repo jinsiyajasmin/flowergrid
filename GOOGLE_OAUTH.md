@@ -50,7 +50,9 @@ Users must start here (not the callback URL):
 
 `https://luna.flowergrid.co.uk/api/auth/google`
 
-The app **Sign up → Continue with Google** button goes to that URL automatically.
+The **Sign up** button uses this URL directly in the frontend (hardcoded for `*.flowergrid.co.uk`). Old paths `/auth/google` redirect to `/api/auth/google` on the server.
+
+After changing frontend code, **rebuild** the Coolify deployment so the new JS bundle is served.
 
 ## 6. Verify
 
