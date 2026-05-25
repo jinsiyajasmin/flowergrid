@@ -23,6 +23,7 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 FRONTEND_URL=https://luna.flowergrid.co.uk
 GOOGLE_CALLBACK_URL=https://luna.flowergrid.co.uk/api/auth/google/callback
+# (Production always uses this URL in code even if env is wrong — must match Google Console.)
 ```
 
 Do **not** set `VITE_API_BASE=http://localhost:4000`.

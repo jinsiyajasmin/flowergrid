@@ -46,6 +46,22 @@ const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 
 const KB_EMBED_CHUNK_OVERLAP = 200;
 
 const LIVE_SITE_URL = 'https://luna.flowergrid.co.uk';
+const GOOGLE_CALLBACK_PATH = '/api/auth/google/callback';
+
+/** Always use /api/auth/google/callback in production (matches Google Console + nginx). */
+function getGoogleCallbackUrl() {
+  if (process.env.NODE_ENV === 'production') {
+    return `${LIVE_SITE_URL}${GOOGLE_CALLBACK_PATH}`;
+  }
+  const fromEnv = process.env.GOOGLE_CALLBACK_URL?.trim();
+  if (fromEnv) {
+    if (fromEnv.includes('/api/auth/google/callback')) return fromEnv;
+    if (fromEnv.includes('/auth/google/callback')) {
+      return fromEnv.replace('/auth/google/callback', '/api/auth/google/callback');
+    }
+  }
+  return `http://localhost:4000${GOOGLE_CALLBACK_PATH}`;
+}
 
 const allowedOrigins = [
   LIVE_SITE_URL,
@@ -184,11 +200,7 @@ if (googleOAuthEnabled) {
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL:
-          process.env.GOOGLE_CALLBACK_URL ||
-          (process.env.NODE_ENV === 'production'
-            ? `${LIVE_SITE_URL}/api/auth/google/callback`
-            : 'http://localhost:4000/api/auth/google/callback'),
+        callbackURL: getGoogleCallbackUrl(),
       },
       async (accessToken, refreshToken, profile, done) => {
         try {
@@ -232,6 +244,10 @@ if (googleOAuthEnabled) {
   );
 }
 
+if (googleOAuthEnabled) {
+  console.log(`Google OAuth callback URL: ${getGoogleCallbackUrl()}`);
+}
+
 
 passport.serializeUser((user, done) => {
   done(null, user);
@@ -259,58 +275,38 @@ function requireGoogleOAuth(req, res, next) {
   next();
 }
 
-function googleAuth(options) {
-  return (req, res, next) => {
-    passport.authenticate('google', options)(req, res, (err) => {
-      if (err) {
-        console.error('Google OAuth error:', err);
-        if (!res.headersSent) {
-          res.status(500).json({
-            error: 'Google sign-in failed',
-            hint: 'Check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_CALLBACK_URL in Coolify.',
-            message:
-              process.env.NODE_ENV === 'production' ? undefined : err.message,
-          });
-        }
-        return;
-      }
-      if (res.headersSent) return;
-      next();
-    });
-  };
+const googleOAuthScopes = ['profile', 'email'];
+
+function googleAuthFailureRedirect() {
+  return (
+    process.env.FRONTEND_URL?.replace(/\/$/, '') ||
+    (process.env.NODE_ENV === 'production' ? LIVE_SITE_URL : 'http://localhost:5173')
+  );
 }
 
 api.get('/auth/google/status', (req, res) => {
   res.json({
     enabled: googleOAuthEnabled,
     database: dbReady ? 'connected' : 'not_connected',
-    callbackUrl:
-      process.env.GOOGLE_CALLBACK_URL ||
-      (process.env.NODE_ENV === 'production'
-        ? `${LIVE_SITE_URL}/api/auth/google/callback`
-        : 'http://localhost:4000/api/auth/google/callback'),
+    callbackUrl: getGoogleCallbackUrl(),
+    startUrl: `${process.env.NODE_ENV === 'production' ? LIVE_SITE_URL : 'http://localhost:4000'}/api/auth/google`,
   });
 });
 
 api.get(
   '/auth/google',
   requireGoogleOAuth,
-  googleAuth({ scope: ['profile', 'email'] })
+  passport.authenticate('google', { scope: googleOAuthScopes })
 );
+
 api.get(
   '/auth/google/callback',
   requireGoogleOAuth,
-  googleAuth({
-    failureRedirect:
-      process.env.FRONTEND_URL?.replace(/\/$/, '') || LIVE_SITE_URL,
+  passport.authenticate('google', {
+    failureRedirect: googleAuthFailureRedirect(),
   }),
   (req, res) => {
-    const frontendUrl =
-      process.env.FRONTEND_URL ||
-      (process.env.NODE_ENV === 'production'
-        ? LIVE_SITE_URL
-        : 'http://localhost:5173');
-    res.redirect(frontendUrl.replace(/\/$/, ''));
+    res.redirect(googleAuthFailureRedirect());
   }
 );
 
