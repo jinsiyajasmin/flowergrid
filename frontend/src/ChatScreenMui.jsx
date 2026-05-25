@@ -722,11 +722,32 @@ export default function ChatScreenMui() {
         }
     }
 
+    /** Switch UI to an empty chat immediately (sidebar New Chat / Chat with Luna). */
+    function openNewChatView() {
+        setShowLanding(false);
+        setConversationMode(true);
+        setActiveConversationId(null);
+        setMessages([]);
+        setInput("");
+        if (!isDesktop) setMobileOpen(false);
+    }
+
+    function refreshConversationList() {
+        if (!user) return;
+        fetch(apiPath("/conversations"), {
+            credentials: "include",
+            headers: { "x-user-id": user.id },
+        })
+            .then((res) => (res.ok ? res.json() : false))
+            .then((data) => {
+                if (Array.isArray(data)) setConversations(data);
+            })
+            .catch(console.error);
+    }
+
     async function startNewChat() {
         if (guestMustSignUp()) {
-            setActiveConversationId(null);
-            setConversationMode(true);
-            setInput("");
+            openNewChatView();
             applyGuestSignupBlock(true);
             return;
         }
@@ -734,20 +755,14 @@ export default function ChatScreenMui() {
         const currentMessages = [...messages];
         const currentSessionId = chatSessionIdRef.current;
 
+        // Navigate to empty chat page immediately; do not wait on API.
+        openNewChatView();
+
+        // Signed-in: save current chat to history in the background.
         if (user && currentMessages.length > 0 && currentSessionId) {
-            try {
-                await sendChatSummary(currentMessages, currentSessionId);
-                const listRes = await fetch(apiPath("/conversations"), {
-                    credentials: "include",
-                    headers: { "x-user-id": user.id },
-                });
-                if (listRes.ok) {
-                    const data = await listRes.json();
-                    if (Array.isArray(data)) setConversations(data);
-                }
-            } catch (err) {
-                console.warn("Background summary failed", err);
-            }
+            sendChatSummary(currentMessages, currentSessionId)
+                .then(() => refreshConversationList())
+                .catch((err) => console.warn("Background summary failed", err));
         }
 
         let sessionData;
@@ -755,8 +770,7 @@ export default function ChatScreenMui() {
             sessionData = await createServerChatSession(user?.id, currentSessionId);
         } catch (err) {
             console.warn("New session failed", err);
-            setMessages((prev) => [
-                ...prev,
+            setMessages([
                 {
                     id: Date.now(),
                     from: "bot",
@@ -774,9 +788,6 @@ export default function ChatScreenMui() {
         const guestLimited = Boolean(sessionData.guestLimitReached);
         applyChatSession(sessionData.sessionId, guestLimited);
 
-        setMessages([]);
-        setActiveConversationId(null);
-        setConversationMode(false);
         setGuestLimitReached(guestLimited);
         setInputDisabled(guestLimited);
         inputDisabledRef.current = guestLimited;
@@ -792,17 +803,8 @@ export default function ChatScreenMui() {
 
         if (user && currentMessages.length > 0 && currentSessionId && activeConversationId !== conversation.id) {
             sendChatSummary(currentMessages, currentSessionId)
-                .then(() => {
-                    // Refresh history list so newly saved title appears
-                    fetch(apiPath("/conversations"), {
-                        credentials: "include",
-                        headers: { 'x-user-id': user.id }
-                    })
-                        .then(res => res.ok && res.json())
-                        .then(data => { if (Array.isArray(data)) setConversations(data) })
-                        .catch(console.error);
-                })
-                .catch(err => console.warn("Background summary failed", err));
+                .then(() => refreshConversationList())
+                .catch((err) => console.warn("Background summary failed", err));
         }
 
         if (inputDisabled && activeConversationId !== conversation.id && !guestMustSignUp()) {
@@ -810,8 +812,10 @@ export default function ChatScreenMui() {
             inputDisabledRef.current = false;
         }
 
+        setShowLanding(false);
         setActiveConversationId(conversation.id);
         setConversationMode(true);
+        if (!isDesktop) setMobileOpen(false);
 
         fetch(apiPath(`/conversations/${conversation.id}`), {
             credentials: "include",
@@ -1249,10 +1253,7 @@ export default function ChatScreenMui() {
                 {user && (
                     <Tooltip title={(isDesktop && collapsed) ? "New Chat" : ""} placement="right">
                         <Box
-                            onClick={() => {
-                                startNewChat();
-                                if (!isDesktop) setMobileOpen(false);
-                            }}
+                            onClick={() => startNewChat()}
                             sx={{
                                 display: "flex",
                                 alignItems: "center",
