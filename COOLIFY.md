@@ -17,7 +17,7 @@ Names must match `docker-compose.yaml` exactly. See `coolify.env.example` for a 
 
 | Variable | Example / notes |
 |----------|-----------------|
-| `DATABASE_URL` | Neon or Coolify Postgres connection string |
+| `DATABASE_URL` | Neon URL **must** end with `?sslmode=require` (see below) |
 | `SESSION_SECRET` | Long random string |
 | `OPENAI_API_KEY` | Your OpenAI key |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` (optional) |
@@ -33,6 +33,23 @@ Names must match `docker-compose.yaml` exactly. See `coolify.env.example` for a 
 Do **not** set `VITE_API_BASE` in Coolify.
 
 After changing env vars → **Redeploy** (restart container).
+
+### Neon `DATABASE_URL` format
+
+```text
+postgresql://USER:PASSWORD@ep-xxxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+```
+
+Copy from Neon dashboard → Connection string → **Pooled connection**.  
+Do **not** use `localhost` or your local `.env` URL in Coolify.
+
+Check after deploy:
+
+```bash
+curl -sS https://luna.flowergrid.co.uk/api/health
+```
+
+Expected: `"database":"connected"`. If `"not_connected"`, read `databaseHint` in the JSON.
 
 ## Deploy
 

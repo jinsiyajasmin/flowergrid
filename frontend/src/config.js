@@ -107,9 +107,12 @@ export async function startGoogleSignIn() {
         );
       }
       if (status.database !== "connected") {
-        throw new Error(
-          "Sign-in requires the database. Set DATABASE_URL in Coolify and redeploy."
-        );
+        const hint =
+          status.databaseHint ||
+          (status.databaseConfigured
+            ? "Database URL is set but the server cannot connect. For Neon use: ?sslmode=require on DATABASE_URL, then redeploy."
+            : "Set DATABASE_URL in Coolify (Neon connection string), then redeploy.");
+        throw new Error(hint);
       }
       if (status.clientId && status.callbackUrl) {
         console.info("Google OAuth clientId:", status.clientId);

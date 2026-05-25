@@ -9,7 +9,12 @@ import OpenAI from 'openai';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import connectDB, { prisma } from './db.js';
+import connectDB, {
+  prisma,
+  normalizeDatabaseUrl,
+  getLastDatabaseError,
+  getDatabaseHostHint,
+} from './db.js';
 import {
   ensureSession,
   getSessionMessages,
@@ -136,13 +141,48 @@ let KB_TEXTS = [];
 let isInitialized = false;
 let dbReady = false;
 let kbIndexReady = false;
+let dbConnectAttempts = 0;
+
+async function ensureDatabase() {
+  if (dbReady) return true;
+  const url = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  if (!url) return false;
+
+  try {
+    await connectDB();
+    dbReady = true;
+    setDbPersistenceEnabled(true);
+    console.log('✅ Database ready');
+    return true;
+  } catch {
+    dbReady = false;
+    setDbPersistenceEnabled(false);
+    return false;
+  }
+}
+
+function databaseStatusPayload() {
+  const url = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  return {
+    database: dbReady ? 'connected' : 'not_connected',
+    databaseConfigured: Boolean(url),
+    databaseHost: url ? getDatabaseHostHint(url) : null,
+    databaseHint: dbReady
+      ? null
+      : getLastDatabaseError() ||
+        (url
+          ? 'Cannot reach PostgreSQL. For Neon add ?sslmode=require to DATABASE_URL and redeploy.'
+          : 'DATABASE_URL is not set in Coolify environment variables.'),
+  };
+}
 
 app.get('/health', (req, res) => res.json({ status: 'alive' }));
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+  await ensureDatabase();
   res.json({
     status: 'alive',
     ready: isInitialized,
-    database: dbReady ? 'connected' : 'not_connected',
+    ...databaseStatusPayload(),
   });
 });
 
@@ -252,17 +292,12 @@ async function initializeApp() {
   if (isInitialized) return;
   loadFloraPrompt();
   configureGoogleOAuth();
-  try {
-    await connectDB();
-    dbReady = true;
-    setDbPersistenceEnabled(true);
-    console.log('✅ Database ready');
-  } catch (err) {
-    dbReady = false;
-    setDbPersistenceEnabled(false);
+  dbConnectAttempts += 1;
+  await ensureDatabase();
+  if (!dbReady) {
     console.error(
-      'PostgreSQL unavailable — chat uses in-memory sessions only:',
-      err?.message || err
+      'PostgreSQL unavailable — sign-in and saved chats need DATABASE_URL. Error:',
+      getLastDatabaseError() || 'unknown'
     );
   }
   isInitialized = true;
@@ -305,17 +340,18 @@ passport.deserializeUser((user, done) => {
 
 const api = express.Router();
 
-function requireGoogleOAuth(req, res, next) {
+async function requireGoogleOAuth(req, res, next) {
   if (!googleOAuthEnabled) {
     return res.status(503).json({
       error: 'Google sign-in is not configured',
       hint: 'Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Coolify.',
     });
   }
+  await ensureDatabase();
   if (!dbReady) {
     return res.status(503).json({
-      error: 'Sign-in requires the database',
-      hint: 'Set DATABASE_URL in Coolify and redeploy.',
+      error: 'Database is not connected',
+      ...databaseStatusPayload(),
     });
   }
   next();
@@ -330,12 +366,13 @@ function googleAuthFailureRedirect() {
   );
 }
 
-api.get('/auth/google/status', (req, res) => {
+api.get('/auth/google/status', async (req, res) => {
+  await ensureDatabase();
   const clientId = getGoogleClientId();
   const callbackUrl = getGoogleCallbackUrl();
   res.json({
     enabled: googleOAuthEnabled,
-    database: dbReady ? 'connected' : 'not_connected',
+    ...databaseStatusPayload(),
     callbackUrl,
     startUrl: isProductionDeploy()
       ? `${LIVE_SITE_URL}/api/auth/google`

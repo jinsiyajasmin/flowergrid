@@ -3,9 +3,17 @@ set -e
 
 cd /app/server
 
+if [ -z "$DATABASE_URL" ]; then
+  echo "ERROR: DATABASE_URL is empty — set it in Coolify Environment Variables"
+  exit 1
+fi
+
+echo "DATABASE_URL host check: $(node -e "try{const u=process.env.DATABASE_URL.trim().replace(/^[\"']|[\"']$/g,'');const h=new URL(u.replace(/^postgresql:/,'http:')).hostname;console.log(h)}catch(e){console.log('invalid URL')}")"
+
 echo "Running database migrations..."
 if ! npx prisma migrate deploy; then
-  echo "WARNING: prisma migrate deploy failed — check DATABASE_URL"
+  echo "ERROR: prisma migrate deploy failed — fix DATABASE_URL (Neon needs ?sslmode=require)"
+  exit 1
 fi
 
 echo "Starting API on port 4000..."
