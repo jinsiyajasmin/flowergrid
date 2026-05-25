@@ -59,6 +59,16 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
+// Allow /api/chat, /api/auth/… on the same host as the frontend (nginx strips /api)
+app.use((req, res, next) => {
+  if (req.path === '/api' || req.path.startsWith('/api/')) {
+    const stripped = req.path === '/api' ? '/' : req.path.slice(4) || '/';
+    const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    req.url = stripped + qs;
+  }
+  next();
+});
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -144,7 +154,7 @@ passport.use(
       callbackURL:
         process.env.GOOGLE_CALLBACK_URL ||
         (process.env.NODE_ENV === 'production'
-          ? `${LIVE_SITE_URL}/auth/google/callback`
+          ? `${LIVE_SITE_URL}/api/auth/google/callback`
           : 'http://localhost:4000/auth/google/callback'),
     },
     async (accessToken, refreshToken, profile, done) => {

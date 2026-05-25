@@ -26,7 +26,7 @@ services:
       EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/auth/google/callback}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-https://luna.flowergrid.co.uk/api/auth/google/callback}
       FRONTEND_URL: ${FRONTEND_URL:-https://luna.flowergrid.co.uk}
     healthcheck:
       test:

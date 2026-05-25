@@ -52,7 +52,7 @@ Use `docker-compose.coolify.yaml` — it runs **server + frontend only** (no Pos
    | `OPENAI_API_KEY` | Your OpenAI key |
    | `FRONTEND_URL` | `https://luna.flowergrid.co.uk` |
    | `VITE_API_BASE` | *(leave empty)* — API uses same domain via nginx |
-   | `GOOGLE_CALLBACK_URL` | `https://luna.flowergrid.co.uk/auth/google/callback` |
+   | `GOOGLE_CALLBACK_URL` | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
    | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth console |
 
 5. Assign domain in Coolify:
@@ -61,11 +61,11 @@ Use `docker-compose.coolify.yaml` — it runs **server + frontend only** (no Pos
 
 6. **Google Cloud Console** → APIs & Services → Credentials → your OAuth client:
    - **Authorized JavaScript origins:** `https://luna.flowergrid.co.uk`
-   - **Authorized redirect URIs:** `https://luna.flowergrid.co.uk/auth/google/callback`
+   - **Authorized redirect URIs:** `https://luna.flowergrid.co.uk/api/auth/google/callback`
 
 7. **Redeploy** after env changes. Do **not** set `VITE_API_BASE` to a separate API domain unless you add DNS for it — leave it empty for single-host deploy.
 
-8. Quick check after deploy: open `https://luna.flowergrid.co.uk/health` — should return `{"status":"alive"}`. If that fails, nginx cannot reach the server container.
+8. Quick check after deploy: open `https://luna.flowergrid.co.uk/api/health` — should return `{"status":"alive"}`. If that fails, nginx cannot reach the server container.
 
 The server container runs `prisma migrate deploy` on startup against `DATABASE_URL`.
 

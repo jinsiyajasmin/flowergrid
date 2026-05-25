@@ -9,18 +9,20 @@ const isLunaLive =
   typeof window !== "undefined" &&
   window.location.hostname === "luna.flowergrid.co.uk";
 
+/** All backend routes are under /api in production (same host as the SPA). */
+export const API_PREFIX = "/api";
+
 /**
  * API base for fetch()/navigation.
  * - Local dev: http://localhost:4000 (separate Vite + Express)
- * - Production (single host): "" so requests go to /chat, /auth/… on the same
- *   domain and nginx proxies them to Express
+ * - Production: /api → nginx proxies to Express
  */
 function resolveApiBase() {
   if (isLocalhost) {
     const envBase = import.meta.env.VITE_API_BASE?.replace(/\/$/, "");
     return envBase || "http://localhost:4000";
   }
-  return "";
+  return API_PREFIX;
 }
 
 export const API_BASE = resolveApiBase();
