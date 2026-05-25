@@ -35,6 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config();
 
 const PORT = process.env.PORT || 4000;
 const KB_DIR = path.join(__dirname, 'kb');
@@ -78,7 +79,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
 }));
 
-app.get('/health', (req, res) => res.json({ status: "alive" }));
 app.get('/', (req, res) => res.send("FlowerGrid API is running"));
 
 app.use((req, res, next) => {
@@ -117,13 +117,36 @@ const openai = new OpenAI({
 
 let KB_TEXTS = [];
 let isInitialized = false;
+let dbReady = false;
+let kbIndexReady = false;
+
+const healthJson = (req, res) => {
+  res.json({
+    status: 'alive',
+    ready: isInitialized,
+    database: dbReady ? 'connected' : 'not_connected',
+  });
+};
+
+app.get('/health', healthJson);
+app.get('/api/health', healthJson);
 
 async function initializeApp() {
   if (isInitialized) return;
   loadFloraPrompt();
   await connectDB();
-  await buildIndex();
+  dbReady = true;
   isInitialized = true;
+}
+
+async function ensureKbIndex() {
+  if (kbIndexReady) return;
+  try {
+    await buildIndex();
+  } catch (err) {
+    console.error('KB index build failed (chat continues without RAG):', err);
+  }
+  kbIndexReady = true;
 }
 
 app.use(async (req, res, next) => {
@@ -131,8 +154,15 @@ app.use(async (req, res, next) => {
     await initializeApp();
     next();
   } catch (err) {
-    console.error("Initialization failed:", err);
-    res.status(500).send("Internal Server Error");
+    console.error('Initialization failed:', err);
+    res.status(503).json({
+      error: 'Database unavailable',
+      hint: 'Set DATABASE_URL in Coolify to your Postgres connection string.',
+      message:
+        process.env.NODE_ENV === 'production'
+          ? undefined
+          : err.message,
+    });
   }
 });
 
@@ -296,12 +326,15 @@ function isGuestExhausted(req) {
   return parseCookies(req)[GUEST_EXHAUSTED_COOKIE] === '1';
 }
 
+const COOKIE_SAME_SITE = 'lax';
+const COOKIE_SECURE = process.env.NODE_ENV === 'production';
+
 function setGuestExhaustedCookie(res) {
   res.cookie(GUEST_EXHAUSTED_COOKIE, '1', {
     maxAge: 365 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
     path: '/',
   });
 }
@@ -309,8 +342,8 @@ function setGuestExhaustedCookie(res) {
 function clearGuestExhaustedCookie(res) {
   res.clearCookie(GUEST_EXHAUSTED_COOKIE, {
     path: '/',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
   });
 }
 
@@ -322,8 +355,8 @@ function setChatSessionCookie(res, sessionId) {
   res.cookie(CHAT_SESSION_COOKIE, sessionId, {
     maxAge: 30 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
     path: '/',
   });
 }
@@ -331,8 +364,8 @@ function setChatSessionCookie(res, sessionId) {
 function clearChatSessionCookie(res) {
   res.clearCookie(CHAT_SESSION_COOKIE, {
     path: '/',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
   });
 }
 
@@ -783,9 +816,14 @@ api.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message required' });
     }
 
-    if (!KB_TEXTS.length) {
-      await buildIndex();
+    if (!process.env.OPENAI_API_KEY?.trim()) {
+      return res.status(503).json({
+        error: 'Chat is not configured',
+        hint: 'Set OPENAI_API_KEY in Coolify environment variables.',
+      });
     }
+
+    await ensureKbIndex();
 
     const text = message.trim();
 
@@ -914,8 +952,18 @@ api.post('/chat', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Chat error:', err);
+    const isDb =
+      err?.code?.startsWith?.('P') ||
+      /connect|database|prisma/i.test(String(err?.message));
+    res.status(isDb ? 503 : 500).json({
+      error: isDb ? 'Database error' : 'Server error',
+      hint: isDb
+        ? 'Check DATABASE_URL in Coolify.'
+        : undefined,
+      message:
+        process.env.NODE_ENV === 'production' ? undefined : err?.message,
+    });
   }
 });
 api.get("/admin/users", async (req, res) => {
@@ -1126,7 +1174,12 @@ api.get('/chat/session/status', async (req, res) => {
     res.json({ sessionId, guestLimitReached });
   } catch (err) {
     console.error('Session status error:', err);
-    res.status(500).json({ error: 'Failed to load session status' });
+    res.status(503).json({
+      error: 'Failed to load session status',
+      hint: 'Check DATABASE_URL in Coolify.',
+      message:
+        process.env.NODE_ENV === 'production' ? undefined : err?.message,
+    });
   }
 });
 
@@ -1211,9 +1264,13 @@ api.post('/chat/session/reset', async (req, res) => {
   }
 });
 
-api.get('/health', (req, res) => res.json({ status: 'alive' }));
-
 app.use('/api', api);
+
+app.use((err, req, res, _next) => {
+  console.error('Unhandled error:', err);
+  if (res.headersSent) return;
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 // Always listen when running as a standalone server (Docker / local dev).
 // Skip only on Vercel serverless where the platform imports `app` without listening.

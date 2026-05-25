@@ -546,15 +546,26 @@ export default function ChatScreenMui() {
         });
     }
 
+    function fallbackSessionId() {
+        const id = crypto.randomUUID();
+        applyChatSession(id, false);
+        return id;
+    }
+
     async function ensureChatSessionId() {
         if (chatSessionIdRef.current) return chatSessionIdRef.current;
-        const status = await fetchSessionStatus(user?.id);
-        applyChatSession(status.sessionId, status.guestLimitReached);
-        if (!user && status.guestLimitReached) {
-            setInputDisabled(true);
-            inputDisabledRef.current = true;
+        try {
+            const status = await fetchSessionStatus(user?.id);
+            applyChatSession(status.sessionId, status.guestLimitReached);
+            if (!user && status.guestLimitReached) {
+                setInputDisabled(true);
+                inputDisabledRef.current = true;
+            }
+            return status.sessionId;
+        } catch (err) {
+            console.warn("Session status failed, using local session", err);
+            return fallbackSessionId();
         }
-        return status.sessionId;
     }
 
     async function sendToServer(text, isVoiceInput = false) {
@@ -577,6 +588,14 @@ export default function ChatScreenMui() {
             sessionId = await ensureChatSessionId();
         } catch (err) {
             console.error("session error", err);
+            setMessages((m) => [
+                ...m,
+                {
+                    id: Date.now(),
+                    from: "bot",
+                    text: "I could not connect to the server. Please refresh and try again.",
+                },
+            ]);
             return;
         }
 
@@ -586,7 +605,8 @@ export default function ChatScreenMui() {
         }
 
         setConversationMode(true);
-        setMessages((m) => [...m, { id: Date.now(), from: "user", text }]);
+        const userMsgId = Date.now();
+        setMessages((m) => [...m, { id: userMsgId, from: "user", text }]);
         setSending(true);
 
         try {
@@ -612,9 +632,14 @@ export default function ChatScreenMui() {
                 try {
                     body = JSON.parse(raw);
                 } catch {
-                    body = raw || resp.statusText;
+                    body = { error: raw || resp.statusText };
                 }
-                throw new Error(`Server ${resp.status}: ${JSON.stringify(body)}`);
+                const msg =
+                    body?.hint ||
+                    body?.error ||
+                    body?.message ||
+                    `Server error (${resp.status})`;
+                throw new Error(msg);
             }
 
             let data;
@@ -666,14 +691,17 @@ export default function ChatScreenMui() {
         } catch (err) {
             if (err.name === "AbortError") return;
             console.error("chat error", err);
-            setMessages((m) => [
-                ...m,
-                {
-                    id: Date.now() + 1,
-                    from: "bot",
-                    text: "⚠️ Server error. Try again.",
-                },
-            ]);
+            const errText =
+                err?.message && err.message.length < 200
+                    ? `⚠️ ${err.message}`
+                    : "⚠️ Server error. Try again.";
+            setMessages((m) => {
+                const withoutUser = m.filter((msg) => msg.id !== userMsgId);
+                return [
+                    ...withoutUser,
+                    { id: Date.now() + 1, from: "bot", text: errText },
+                ];
+            });
         } finally {
             chatAbortRef.current = null;
             setSending(false);
