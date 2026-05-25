@@ -20,7 +20,7 @@ export const API_PREFIX = "/api";
 function resolveApiBase() {
   if (isLocalhost) {
     const envBase = import.meta.env.VITE_API_BASE?.replace(/\/$/, "");
-    return envBase || "http://localhost:4000";
+    return envBase || "http://localhost:4000/api";
   }
   return API_PREFIX;
 }

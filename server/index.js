@@ -59,16 +59,6 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// Allow /api/chat, /api/auth/… on the same host as the frontend (nginx strips /api)
-app.use((req, res, next) => {
-  if (req.path === '/api' || req.path.startsWith('/api/')) {
-    const stripped = req.path === '/api' ? '/' : req.path.slice(4) || '/';
-    const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-    req.url = stripped + qs;
-  }
-  next();
-});
-
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -107,7 +97,7 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+      sameSite: 'lax',
     }
   })
 );
@@ -197,16 +187,20 @@ passport.deserializeUser((user, done) => {
   done(null, user);
 });
 
+const api = express.Router();
 
-app.get(
+api.get(
   '/auth/google',
   passport.authenticate('google', {
     scope: ['profile', 'email'],
   })
 );
-app.get(
+api.get(
   '/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/' }),
+  passport.authenticate('google', {
+    failureRedirect:
+      process.env.FRONTEND_URL?.replace(/\/$/, '') || LIVE_SITE_URL,
+  }),
   (req, res) => {
     const frontendUrl =
       process.env.FRONTEND_URL ||
@@ -217,7 +211,7 @@ app.get(
   }
 );
 
-app.get('/auth/me', async (req, res) => {
+api.get('/auth/me', async (req, res) => {
   try {
     if (req.isAuthenticated?.() && req.user) {
       return res.json({ user: publicUser(req.user) });
@@ -233,7 +227,7 @@ app.get('/auth/me', async (req, res) => {
   }
 });
 
-app.post('/auth/logout', (req, res) => {
+api.post('/auth/logout', (req, res) => {
   const finish = () => {
     clearGuestExhaustedCookie(res);
     clearChatSessionCookie(res);
@@ -781,7 +775,7 @@ async function chatWithFlora(history, userMessage, options = {}) {
 }
 
 
-app.post('/chat', async (req, res) => {
+api.post('/chat', async (req, res) => {
   try {
     const { message } = req.body;
 
@@ -924,7 +918,7 @@ app.post('/chat', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-app.get("/admin/users", async (req, res) => {
+api.get("/admin/users", async (req, res) => {
   try {
     if (!isAdmin(req)) {
       return res.status(403).json({ error: "Access denied" });
@@ -941,7 +935,7 @@ app.get("/admin/users", async (req, res) => {
 });
 
 
-app.get("/admin/summaries", async (req, res) => {
+api.get("/admin/summaries", async (req, res) => {
   try {
     const summaries = await prisma.chatSummary.findMany({
       orderBy: { createdAt: 'desc' },
@@ -954,7 +948,7 @@ app.get("/admin/summaries", async (req, res) => {
   }
 });
 
-app.get("/conversations", authenticateUser, async (req, res) => {
+api.get("/conversations", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -979,7 +973,7 @@ app.get("/conversations", authenticateUser, async (req, res) => {
   }
 });
 
-app.get("/conversations/:id", authenticateUser, async (req, res) => {
+api.get("/conversations/:id", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -1012,7 +1006,7 @@ app.get("/conversations/:id", authenticateUser, async (req, res) => {
   }
 });
 
-app.delete("/conversations/:id", authenticateUser, async (req, res) => {
+api.delete("/conversations/:id", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -1036,7 +1030,7 @@ app.delete("/conversations/:id", authenticateUser, async (req, res) => {
 
 
 
-app.post("/chat/summary", authenticateUser, async (req, res) => {
+api.post("/chat/summary", authenticateUser, async (req, res) => {
   try {
     if (!req.user) {
       return res.status(401).json({ error: "Not authenticated" });
@@ -1114,7 +1108,7 @@ app.post("/chat/summary", authenticateUser, async (req, res) => {
 
 
 
-app.get('/chat/session/status', async (req, res) => {
+api.get('/chat/session/status', async (req, res) => {
   try {
     const user = await getRequestUser(req);
     let sessionId = getChatSessionCookie(req);
@@ -1136,7 +1130,7 @@ app.get('/chat/session/status', async (req, res) => {
   }
 });
 
-app.post('/chat/session/new', async (req, res) => {
+api.post('/chat/session/new', async (req, res) => {
   try {
     const user = await getRequestUser(req);
     const previousId = resolveSessionId(req);
@@ -1156,7 +1150,7 @@ app.post('/chat/session/new', async (req, res) => {
   }
 });
 
-app.post('/chat/session/activate', async (req, res) => {
+api.post('/chat/session/activate', async (req, res) => {
   try {
     const { sessionId } = req.body;
     if (!sessionId || typeof sessionId !== 'string') {
@@ -1175,7 +1169,7 @@ app.post('/chat/session/activate', async (req, res) => {
   }
 });
 
-app.post('/chat/session/resume', async (req, res) => {
+api.post('/chat/session/resume', async (req, res) => {
   try {
     const { sessionId, messages } = req.body;
     if (!sessionId) {
@@ -1204,7 +1198,7 @@ app.post('/chat/session/resume', async (req, res) => {
   }
 });
 
-app.post('/chat/session/reset', async (req, res) => {
+api.post('/chat/session/reset', async (req, res) => {
   try {
     const sessionId = resolveSessionId(req);
     if (sessionId) {
@@ -1216,6 +1210,10 @@ app.post('/chat/session/reset', async (req, res) => {
     res.status(500).json({ error: 'Failed to reset session' });
   }
 });
+
+api.get('/health', (req, res) => res.json({ status: 'alive' }));
+
+app.use('/api', api);
 
 if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
   app.listen(PORT, '0.0.0.0', () => {

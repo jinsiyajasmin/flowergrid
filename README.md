@@ -11,7 +11,7 @@ docker compose up --build -d
 ```
 
 - Frontend: http://localhost:5173
-- API: http://localhost:4000/health
+- API: http://localhost:4000/api/health
 - PostgreSQL: `localhost:5432` (user/password/db: `flowergrid`)
 
 The server container runs `prisma migrate deploy` on startup to apply migrations.
@@ -36,38 +36,51 @@ npm install
 npm run dev
 ```
 
-## Deploy on Coolify (external database)
+API base locally: `http://localhost:4000/api`
 
-Use `docker-compose.coolify.yaml` — it runs **server + frontend only** (no Postgres container). You attach your own database in Coolify after deploy.
+## Deploy on Coolify (recommended: one container)
 
-1. In Coolify, create a new **Docker Compose** resource from this repo.
-2. Set **Docker Compose Location** to `docker-compose.coolify.yaml`.
-3. Create a **PostgreSQL** database in Coolify (or use an existing one).
-4. Set environment variables on the compose stack (see `.env.example`):
+Use **`docker-compose.coolify.yaml`** or build **`Dockerfile.coolify`** — this runs **nginx + Express in a single container**:
 
-   | Variable | Example |
-   |----------|---------|
-   | `DATABASE_URL` | From Coolify Postgres → Connection string |
+- Public site: `https://luna.flowergrid.co.uk` (port **80**)
+- All API routes: `https://luna.flowergrid.co.uk/api/...` (e.g. `/api/chat`, `/api/auth/google`)
+
+### Coolify setup
+
+1. Docker Compose file: `docker-compose.coolify.yaml` (one service: `app`)
+2. Domain: **`luna.flowergrid.co.uk`** → port **80**
+3. Environment variables:
+
+   | Variable | Value |
+   |----------|--------|
+   | `DATABASE_URL` | Coolify Postgres connection string |
    | `SESSION_SECRET` | Long random string |
    | `OPENAI_API_KEY` | Your OpenAI key |
    | `FRONTEND_URL` | `https://luna.flowergrid.co.uk` |
-   | `VITE_API_BASE` | *(leave empty)* — API uses same domain via nginx |
    | `GOOGLE_CALLBACK_URL` | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
-   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth console |
+   | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | From Google Cloud |
 
-5. Assign domain in Coolify:
-   - **frontend** → `luna.flowergrid.co.uk` (port **`80`**) — nginx proxies API routes to the server container
-   - **server** does not need a public domain (only reachable on the Docker network as `server:4000`)
+4. Do **not** set a separate backend domain. Leave `VITE_API_BASE` empty (defaults to `/api` in the build).
 
-6. **Google Cloud Console** → APIs & Services → Credentials → your OAuth client:
-   - **Authorized JavaScript origins:** `https://luna.flowergrid.co.uk`
-   - **Authorized redirect URIs:** `https://luna.flowergrid.co.uk/api/auth/google/callback`
+5. **Redeploy** after env changes.
 
-7. **Redeploy** after env changes. Do **not** set `VITE_API_BASE` to a separate API domain unless you add DNS for it — leave it empty for single-host deploy.
+### Verify after deploy
 
-8. Quick check after deploy: open `https://luna.flowergrid.co.uk/api/health` — should return `{"status":"alive"}`. If that fails, nginx cannot reach the server container.
+Open: `https://luna.flowergrid.co.uk/api/health`  
+Expected: `{"status":"alive"}`
 
-The server container runs `prisma migrate deploy` on startup against `DATABASE_URL`.
+### Google OAuth console (required)
+
+[Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → your OAuth 2.0 Client ID:
+
+| Field | URL |
+|-------|-----|
+| **Authorized JavaScript origins** | `https://luna.flowergrid.co.uk` |
+| **Authorized redirect URIs** | `https://luna.flowergrid.co.uk/api/auth/google/callback` |
+
+Remove any `api.flowergrid.co.uk` or `localhost` entries unless you still use them for local dev.
+
+Save in Google Console, wait a few minutes, then test **Sign up** and **chat**.
 
 ## Database
 
