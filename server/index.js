@@ -43,7 +43,11 @@ const SESSION_MAX_MESSAGES = 8;
 const KB_EMBED_SLICE_LIMIT = parseInt(process.env.EMBED_SLICE_LIMIT || '24000', 10);
 const KB_EMBED_CHUNK_OVERLAP = 200;
 
+const LIVE_FRONTEND_URL = 'https://luna.flowergrid.co.uk';
+const LIVE_API_URL = 'https://api.flowergrid.co.uk';
+
 const allowedOrigins = [
+  LIVE_FRONTEND_URL,
   'https://flowergrid.vercel.app',
   'http://localhost:5173',
   'http://localhost:4000',
@@ -133,7 +137,11 @@ passport.use(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:4000/auth/google/callback",
+      callbackURL:
+        process.env.GOOGLE_CALLBACK_URL ||
+        (process.env.NODE_ENV === 'production'
+          ? `${LIVE_API_URL}/auth/google/callback`
+          : 'http://localhost:4000/auth/google/callback'),
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -186,8 +194,12 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/' }),
   (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-    res.redirect(frontendUrl);
+    const frontendUrl =
+      process.env.FRONTEND_URL ||
+      (process.env.NODE_ENV === 'production'
+        ? LIVE_FRONTEND_URL
+        : 'http://localhost:5173');
+    res.redirect(frontendUrl.replace(/\/$/, ''));
   }
 );
 
