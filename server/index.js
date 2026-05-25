@@ -1215,9 +1215,11 @@ api.get('/health', (req, res) => res.json({ status: 'alive' }));
 
 app.use('/api', api);
 
-if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+// Always listen when running as a standalone server (Docker / local dev).
+// Skip only on Vercel serverless where the platform imports `app` without listening.
+if (process.env.VERCEL !== '1') {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🌼 Luna is live on port ${PORT}`);
+    console.log(`🌼 Luna API listening on 0.0.0.0:${PORT} (routes under /api)`);
   });
 }
 

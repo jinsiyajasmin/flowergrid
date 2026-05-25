@@ -2,5 +2,9 @@ node_modules
 .git
 **/.env
 **/.env.*
+!**/.env.example
 **/dist
 **/.DS_Store
+frontend/node_modules
+server/node_modules
+.cursor

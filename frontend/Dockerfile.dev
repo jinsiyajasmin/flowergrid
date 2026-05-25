@@ -1,3 +1,4 @@
+# LOCAL DEV ONLY — do not use for Coolify production (no API; breaks /api/chat and signup)
 FROM node:20-alpine
 
 WORKDIR /app

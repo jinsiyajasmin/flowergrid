@@ -5,7 +5,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile.coolify
+      dockerfile: Dockerfile
     restart: unless-stopped
     expose:
       - "80"
